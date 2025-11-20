@@ -18,7 +18,6 @@ const elements = {
     reportContent: document.getElementById('reportContent'),
     riskContent: document.getElementById('riskContent'),
     statChars: document.getElementById('statChars'),
-    statModel: document.getElementById('statModel'),
     statDate: document.getElementById('statDate'),
     // NUEVO: Elemento de carga de archivo
     pdfUpload: document.getElementById('pdfUpload')
@@ -276,7 +275,6 @@ function displayResults(markdown, charCount) {
  */
 function updateStatistics(charCount) {
     elements.statChars.textContent = charCount.toLocaleString();
-    elements.statModel.textContent = "Llama 3.3 70B";
     elements.statDate.textContent = new Date().toLocaleDateString('es-MX', {
         year: 'numeric',
         month: 'long',
