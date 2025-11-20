@@ -6,6 +6,8 @@
 // Variables globales
 let currentMarkdown = '';
 let currentCharCount = 0;
+let currentInputMode = 'text'; // 'text' o 'file'
+let selectedFile = null;
 
 // Elementos del DOM
 const elements = {
@@ -18,7 +20,13 @@ const elements = {
     riskContent: document.getElementById('riskContent'),
     statChars: document.getElementById('statChars'),
     statModel: document.getElementById('statModel'),
-    statDate: document.getElementById('statDate')
+    statDate: document.getElementById('statDate'),
+    pdfFile: document.getElementById('pdfFile'),
+    fileInfo: document.getElementById('fileInfo'),
+    fileName: document.getElementById('fileName'),
+    fileSize: document.getElementById('fileSize'),
+    textInputMode: document.getElementById('textInputMode'),
+    fileInputMode: document.getElementById('fileInputMode')
 };
 
 /**

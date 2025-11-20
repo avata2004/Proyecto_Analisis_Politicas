@@ -44,25 +44,83 @@
 
         <!-- Input Section -->
         <section class="input-section">
-            <div class="input-container">
-                <label for="privacyText" class="input-label">
-                    <span>Pega el texto de la política de privacidad</span>
-                </label>
-                <textarea 
-                    id="privacyText" 
-                    class="text-input" 
-                    placeholder="Ejemplo: Al utilizar nuestro servicio, recopilamos tu nombre, correo electrónico..."
-                    rows="10"
-                ></textarea>
-                <div class="input-footer">
-                    <span class="char-counter">
-                        <span id="charCount">0</span> caracteres
-                    </span>
-                    <span class="input-hint">Mínimo 50 caracteres</span>
+            <!-- Opciones de entrada -->
+            <div class="input-options">
+                <button class="option-btn active" onclick="switchInputMode('text')" data-mode="text">
+                    <span class="option-icon">✍️</span>
+                    <span>Pegar Texto</span>
+                </button>
+                <button class="option-btn" onclick="switchInputMode('file')" data-mode="file">
+                    <span class="option-icon">📎</span>
+                    <span>Subir PDF</span>
+                </button>
+            </div>
+
+            <!-- Modo: Pegar texto -->
+            <div id="textInputMode" class="input-mode active">
+                <div class="input-container">
+                    <label for="privacyText" class="input-label">
+                        <span class="label-icon">📄</span>
+                        <span>Pega el texto de la política de privacidad</span>
+                    </label>
+                    <textarea 
+                        id="privacyText" 
+                        class="text-input" 
+                        placeholder="Ejemplo: Al utilizar nuestro servicio, recopilamos tu nombre, correo electrónico..."
+                        rows="10"
+                    ></textarea>
+                    <div class="input-footer">
+                        <span class="char-counter">
+                            <span id="charCount">0</span> caracteres
+                        </span>
+                        <span class="input-hint">Mínimo 50 caracteres</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modo: Subir archivo -->
+            <div id="fileInputMode" class="input-mode">
+                <div class="file-upload-container">
+                    <input 
+                        type="file" 
+                        id="pdfFile" 
+                        accept=".pdf,application/pdf"
+                        class="file-input"
+                        onchange="handleFileSelect(event)"
+                    >
+                    <label for="pdfFile" class="file-upload-label">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                        <span class="upload-text">
+                            <strong>Haz clic para seleccionar</strong> o arrastra un archivo PDF
+                        </span>
+                        <span class="upload-hint">PDF de hasta 10MB</span>
+                    </label>
+                    
+                    <!-- Archivo seleccionado -->
+                    <div id="fileInfo" class="file-info">
+                        <div class="file-details">
+                            <svg class="file-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                            </svg>
+                            <div class="file-text">
+                                <span id="fileName" class="file-name"></span>
+                                <span id="fileSize" class="file-size"></span>
+                            </div>
+                        </div>
+                        <button class="btn-remove" onclick="removeFile()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <button id="analyzeBtn" class="btn-primary" onclick="analyzePrivacy()">
+                <span class="btn-icon">🔍</span>
                 <span>Analizar Documento</span>
             </button>
         </section>
@@ -119,7 +177,7 @@
                 <!-- Tab 2: Alertas de Riesgo -->
                 <div class="tab-panel" data-panel="1">
                     <div class="risk-alert-box">
-                        <h3 class="risk-title">Puntos Críticos Detectados</h3>
+                        <h3 class="risk-title">⚠️ Puntos Críticos Detectados</h3>
                         <p class="risk-description">
                             Revisa cuidadosamente las siguientes banderas rojas identificadas en el documento:
                         </p>
@@ -131,24 +189,28 @@
                 <div class="tab-panel" data-panel="2">
                     <div class="stats-grid">
                         <div class="stat-card">
+                            <div class="stat-icon">📝</div>
                             <div class="stat-info">
                                 <span class="stat-label">Caracteres analizados</span>
                                 <span class="stat-value" id="statChars">-</span>
                             </div>
                         </div>
                         <div class="stat-card">
+                            <div class="stat-icon">🤖</div>
                             <div class="stat-info">
                                 <span class="stat-label">Modelo de IA</span>
                                 <span class="stat-value" id="statModel">-</span>
                             </div>
                         </div>
                         <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
                             <div class="stat-info">
                                 <span class="stat-label">Fecha de análisis</span>
                                 <span class="stat-value" id="statDate">-</span>
                             </div>
                         </div>
                         <div class="stat-card">
+                            <div class="stat-icon">✅</div>
                             <div class="stat-info">
                                 <span class="stat-label">Estado</span>
                                 <span class="stat-value stat-success">Completado</span>
