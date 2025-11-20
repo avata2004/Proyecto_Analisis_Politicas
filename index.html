@@ -46,7 +46,6 @@
         <section class="input-section">
             <div class="input-container">
                 <label for="privacyText" class="input-label">
-                    <span class="label-icon">📄</span>
                     <span>Pega el texto de la política de privacidad</span>
                 </label>
                 <textarea 
@@ -64,7 +63,6 @@
             </div>
 
             <button id="analyzeBtn" class="btn-primary" onclick="analyzePrivacy()">
-                <span class="btn-icon">🔍</span>
                 <span>Analizar Documento</span>
             </button>
         </section>
@@ -121,7 +119,7 @@
                 <!-- Tab 2: Alertas de Riesgo -->
                 <div class="tab-panel" data-panel="1">
                     <div class="risk-alert-box">
-                        <h3 class="risk-title">⚠️ Puntos Críticos Detectados</h3>
+                        <h3 class="risk-title">Puntos Críticos Detectados</h3>
                         <p class="risk-description">
                             Revisa cuidadosamente las siguientes banderas rojas identificadas en el documento:
                         </p>
@@ -133,21 +131,18 @@
                 <div class="tab-panel" data-panel="2">
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <!--<div class="stat-icon">📝</div> -->
                             <div class="stat-info">
                                 <span class="stat-label">Caracteres analizados</span>
                                 <span class="stat-value" id="statChars">-</span>
                             </div>
                         </div>
                         <div class="stat-card">
-                            <!-- <div class="stat-icon">🤖</div> -->
                             <div class="stat-info">
                                 <span class="stat-label">Modelo de IA</span>
                                 <span class="stat-value" id="statModel">-</span>
                             </div>
                         </div>
                         <div class="stat-card">
-                            <!-- <div class="stat-icon">⏱️</div> -->
                             <div class="stat-info">
                                 <span class="stat-label">Fecha de análisis</span>
                                 <span class="stat-value" id="statDate">-</span>
