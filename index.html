@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Guard AI</title>
+    <title>🛡️ Privacy Guard AI</title>
     <style>
         * {
             margin: 0;
@@ -222,12 +222,6 @@
             color: #991b1b;
         }
 
-        .alert-warning {
-            background: #fef3c7;
-            border-left: 5px solid #f59e0b;
-            color: #92400e;
-        }
-
         .red-flag-box {
             border: 1px solid #ef4444;
             background-color: #fef2f2;
@@ -300,20 +294,20 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Privacy Guard AI</h1>
+            <h1>🛡️ Privacy Guard AI</h1>
             <p>Analizador Inteligente de Términos y Condiciones</p>
         </div>
 
         <div class="content">
             <div class="info-box">
-                <h3>Sobre esta herramienta</h3>
+                <h3>ℹ️ Sobre esta herramienta</h3>
                 <p>Esta herramienta utiliza Inteligencia Artificial para analizar la "letra pequeña" de políticas de
                     privacidad y términos de servicio. Tu texto se procesa de forma segura y no se almacena en nuestros
                     servidores.</p>
             </div>
 
             <div class="input-group">
-                <label for="tcText">Pega el texto legal aquí:</label>
+                <label for="tcText">📄 Pega el texto legal aquí:</label>
                 <textarea id="tcText" rows="12"
                     placeholder="Ejemplo: 1. Introducción. Al utilizar este servicio, usted acepta..."></textarea>
                 <div class="char-count">Caracteres: <span id="charCount">0</span></div>
@@ -325,7 +319,7 @@
 
             <div class="spinner" id="spinner">
                 <div class="spinner-icon"></div>
-                <p>La IA está analizando el documento...</p>
+                <p>🕵️ La IA está analizando el documento...</p>
             </div>
 
             <div class="results" id="results">
@@ -342,13 +336,13 @@
                 <div class="tab-content active" id="tab0">
                     <div class="markdown-content" id="reportContent"></div>
                     <a href="#" class="download-btn" id="downloadBtn" download="reporte_privacidad.md">
-                        Descargar Reporte
+                        📥 Descargar Reporte
                     </a>
                 </div>
 
                 <div class="tab-content" id="tab1">
                     <div class="red-flag-box">
-                        <h3>Zona de Alerta</h3>
+                        <h3>🚨 Zona de Alerta</h3>
                         <p>Revisa las <strong>banderas rojas</strong> en el reporte para identificar los riesgos
                             principales de este documento.</p>
                     </div>
@@ -357,7 +351,7 @@
 
                 <div class="tab-content" id="tab2">
                     <div style="background: white; padding: 20px; border-radius: 8px;">
-                        <h3>Información del Análisis</h3>
+                        <h3>📊 Información del Análisis</h3>
                         <pre id="technicalData"
                             style="background: #f1f5f9; padding: 15px; border-radius: 5px; overflow-x: auto;"></pre>
                     </div>
@@ -367,9 +361,6 @@
     </div>
 
     <script>
-        const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-        const AI_MODEL = "qwen/qwen-2.5-coder-32b-instruct:free";
-
         const textarea = document.getElementById('tcText');
         const charCount = document.getElementById('charCount');
         const analyzeBtn = document.getElementById('analyzeBtn');
@@ -405,7 +396,7 @@
             const text = textarea.value.trim();
 
             if (text.length < 50) {
-                alert('El texto es muy corto para un análisis significativo.');
+                alert('⚠️ El texto es muy corto para un análisis significativo.');
                 return;
             }
 
@@ -421,46 +412,50 @@ El tono debe ser profesional pero comprensible para un usuario promedio.
 
 Estructura OBLIGATORIA de la respuesta:
 
-1.  **Resumen Ejecutivo**: (Máx 100 palabras) Una visión general del nivel de intrusión.
-2.  **Datos Personales Recolectados**: Lista con viñetas (e.g., email, ubicación, IP, datos biométricos).
-3.  **Compartición con Terceros**: ¿A quién le venden o dan los datos? (Partners, anunciantes, gobierno).
-4.  **Banderas Rojas (Riesgos Altos)**: Cláusulas peligrosas, renuncias de derechos excesivas o retención indefinida.
-5.  **Retención y Derechos**: Cuánto tiempo guardan los datos y cómo borrarlos.
-6.  **Recomendaciones de Seguridad**: 3 consejos prácticos para el usuario basados en este texto.
+1.  **🛡️ Resumen Ejecutivo**: (Máx 100 palabras) Una visión general del nivel de intrusión.
+2.  **🕵️ Datos Personales Recolectados**: Lista con viñetas (e.g., email, ubicación, IP, datos biométricos).
+3.  **📢 Compartición con Terceros**: ¿A quién le venden o dan los datos? (Partners, anunciantes, gobierno).
+4.  **🚩 Banderas Rojas (Riesgos Altos)**: Cláusulas peligrosas, renuncias de derechos excesivas o retención indefinida.
+5.  **⏳ Retención y Derechos**: Cuánto tiempo guardan los datos y cómo borrarlos.
+6.  **✅ Recomendaciones de Seguridad**: 3 consejos prácticos para el usuario basados en este texto.
 
 Si el texto proporcionado NO parece ser un término legal o política de privacidad, responde solamente: "ERROR_CONTEXTO: El texto proporcionado no parece ser un documento legal válido para analizar."`;
 
             try {
+                console.log('Enviando solicitud a la función...');
+
                 const response = await fetch("/.netlify/functions/analyze", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        model: AI_MODEL,
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            { role: 'user', content: `TEXTO A ANALIZAR:\n${text}` }
-                        ]
+                        systemPrompt: systemPrompt,
+                        userText: text
                     })
                 });
 
+                console.log('Respuesta recibida:', response.status);
 
                 if (!response.ok) {
-                    throw new Error(`Error de API: ${response.status} ${response.statusText}`);
+                    const errorData = await response.json();
+                    console.error('Error de la API:', errorData);
+                    throw new Error(errorData.error || `Error ${response.status}`);
                 }
 
                 const data = await response.json();
+                console.log('Datos parseados correctamente');
+
                 const aiResponse = data.content;
 
                 if (aiResponse.includes('ERROR_CONTEXTO')) {
-                    alert('El texto no parece ser un documento legal válido.');
+                    alert('❌ El texto no parece ser un documento legal válido.');
                     return;
                 }
 
                 displayResults(aiResponse, text.length);
 
             } catch (error) {
-                alert(`Error: ${error.message}`);
-                console.error(error);
+                console.error('Error completo:', error);
+                alert(`❌ Error: ${error.message}\n\nPor favor, verifica:\n1. Que la variable GROQ_API_KEY esté configurada en Netlify\n2. Que tengas créditos disponibles en Groq\n3. Revisa la consola (F12) para más detalles`);
             } finally {
                 analyzeBtn.disabled = false;
                 spinner.classList.remove('active');
@@ -484,7 +479,7 @@ Si el texto proporcionado NO parece ser un término legal o política de privaci
 
             const techData = {
                 caracteres_analizados: charCount,
-                modelo: AI_MODEL,
+                modelo: "Llama 3.3 70B (via Groq)",
                 estado: "Procesado",
                 fecha_analisis: new Date().toLocaleString('es-MX')
             };
