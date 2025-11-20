@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🛡️ Privacy Guard AI</title>
+    
+    <!-- Librerías para PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -231,19 +236,45 @@
             margin-bottom: 15px;
         }
 
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
         .download-btn {
-            display: inline-block;
-            padding: 10px 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
             background: #10b981;
             color: white;
             text-decoration: none;
             border-radius: 8px;
-            margin-top: 15px;
-            transition: background 0.3s;
+            border: none;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
         }
 
         .download-btn:hover {
             background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .download-btn.secondary {
+            background: #3b82f6;
+        }
+
+        .download-btn.secondary:hover {
+            background: #2563eb;
+        }
+
+        .download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .markdown-content {
@@ -275,6 +306,70 @@
             color: #0f172a;
         }
 
+        /* Estilos para el PDF */
+        #pdf-content {
+            display: none;
+            background: white;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        #pdf-content h1 {
+            color: #0f172a;
+            font-size: 28px;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        #pdf-content h2 {
+            color: #1e293b;
+            font-size: 20px;
+            margin-top: 25px;
+            margin-bottom: 12px;
+        }
+
+        #pdf-content h3 {
+            color: #334155;
+            font-size: 16px;
+            margin-top: 15px;
+            margin-bottom: 8px;
+        }
+
+        #pdf-content p {
+            margin-bottom: 12px;
+            line-height: 1.6;
+            color: #1e293b;
+        }
+
+        #pdf-content ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        #pdf-content li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        #pdf-content .pdf-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+        }
+
+        #pdf-content .pdf-footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.8rem;
@@ -286,6 +381,15 @@
 
             .tabs {
                 flex-direction: column;
+            }
+
+            .download-buttons {
+                flex-direction: column;
+            }
+
+            .download-btn {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
@@ -335,9 +439,11 @@
 
                 <div class="tab-content active" id="tab0">
                     <div class="markdown-content" id="reportContent"></div>
-                    <a href="#" class="download-btn" id="downloadBtn" download="reporte_privacidad.md">
-                        📥 Descargar Reporte
-                    </a>
+                    <div class="download-buttons">
+                        <button class="download-btn" onclick="downloadPDF()" id="pdfBtn">
+                            📥 Descargar PDF
+                        </button>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="tab1">
@@ -360,12 +466,18 @@
         </div>
     </div>
 
+    <!-- Contenedor oculto para generar el PDF -->
+    <div id="pdf-content"></div>
+
     <script>
         const textarea = document.getElementById('tcText');
         const charCount = document.getElementById('charCount');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const spinner = document.getElementById('spinner');
         const results = document.getElementById('results');
+        
+        let currentMarkdown = '';
+        let currentCharCount = 0;
 
         textarea.addEventListener('input', () => {
             const count = textarea.value.length;
@@ -392,6 +504,137 @@
                 .replace(/\n\n/g, '<br><br>');
         }
 
+        async function downloadPDF() {
+            const pdfBtn = document.getElementById('pdfBtn');
+            pdfBtn.disabled = true;
+            pdfBtn.textContent = '⏳ Generando PDF...';
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                // Configuración
+                const margin = 20;
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const maxWidth = pageWidth - (margin * 2);
+                let yPosition = margin;
+
+                // Función para agregar nueva página si es necesario
+                function checkPageBreak(neededSpace) {
+                    if (yPosition + neededSpace > pageHeight - margin) {
+                        doc.addPage();
+                        yPosition = margin;
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Header del PDF
+                doc.setFillColor(15, 23, 42);
+                doc.rect(0, 0, pageWidth, 40, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
+                doc.setFont(undefined, 'bold');
+                doc.text('🛡️ Privacy Guard AI', pageWidth / 2, 20, { align: 'center' });
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'normal');
+                doc.text('Análisis de Política de Privacidad', pageWidth / 2, 30, { align: 'center' });
+
+                yPosition = 50;
+
+                // Procesar el markdown
+                const lines = currentMarkdown.split('\n');
+                doc.setTextColor(0, 0, 0);
+
+                for (let i = 0; i < lines.length; i++) {
+                    let line = lines[i].trim();
+                    if (!line) continue;
+
+                    // Títulos H2
+                    if (line.startsWith('## ')) {
+                        checkPageBreak(15);
+                        doc.setFontSize(16);
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(30, 41, 59);
+                        const title = line.replace('## ', '').replace(/\*\*/g, '');
+                        doc.text(title, margin, yPosition);
+                        yPosition += 10;
+                    }
+                    // Títulos H3
+                    else if (line.startsWith('### ')) {
+                        checkPageBreak(12);
+                        doc.setFontSize(14);
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(51, 65, 85);
+                        const title = line.replace('### ', '').replace(/\*\*/g, '');
+                        doc.text(title, margin, yPosition);
+                        yPosition += 8;
+                    }
+                    // Listas
+                    else if (line.startsWith('* ') || line.startsWith('- ')) {
+                        checkPageBreak(10);
+                        doc.setFontSize(11);
+                        doc.setFont(undefined, 'normal');
+                        doc.setTextColor(30, 41, 59);
+                        const text = line.replace(/^[*-] /, '').replace(/\*\*/g, '');
+                        const splitText = doc.splitTextToSize('• ' + text, maxWidth - 10);
+                        doc.text(splitText, margin + 5, yPosition);
+                        yPosition += splitText.length * 6;
+                    }
+                    // Texto normal
+                    else {
+                        checkPageBreak(10);
+                        doc.setFontSize(11);
+                        doc.setFont(undefined, 'normal');
+                        doc.setTextColor(30, 41, 59);
+                        const text = line.replace(/\*\*/g, '');
+                        const splitText = doc.splitTextToSize(text, maxWidth);
+                        doc.text(splitText, margin, yPosition);
+                        yPosition += splitText.length * 6;
+                    }
+                }
+
+                // Footer
+                const totalPages = doc.internal.pages.length - 1;
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(9);
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(
+                        `Generado por Privacy Guard AI - ${new Date().toLocaleDateString('es-MX')} - Página ${i} de ${totalPages}`,
+                        pageWidth / 2,
+                        pageHeight - 10,
+                        { align: 'center' }
+                    );
+                }
+
+                // Guardar el PDF
+                const fecha = new Date().toISOString().split('T')[0];
+                doc.save(`analisis_privacidad_${fecha}.pdf`);
+
+                pdfBtn.disabled = false;
+                pdfBtn.innerHTML = '📥 Descargar PDF';
+
+            } catch (error) {
+                console.error('Error generando PDF:', error);
+                alert('❌ Error al generar el PDF. Por favor, intenta de nuevo.');
+                pdfBtn.disabled = false;
+                pdfBtn.innerHTML = '📥 Descargar PDF';
+            }
+        }
+
+        function downloadMarkdown() {
+            const blob = new Blob([currentMarkdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const fecha = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `analisis_privacidad_${fecha}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         async function analyzePrivacy() {
             const text = textarea.value.trim();
 
@@ -412,18 +655,27 @@ El tono debe ser profesional pero comprensible para un usuario promedio.
 
 Estructura OBLIGATORIA de la respuesta:
 
-1.  **🛡️ Resumen Ejecutivo**: (Máx 100 palabras) Una visión general del nivel de intrusión.
-2.  **🕵️ Datos Personales Recolectados**: Lista con viñetas (e.g., email, ubicación, IP, datos biométricos).
-3.  **📢 Compartición con Terceros**: ¿A quién le venden o dan los datos? (Partners, anunciantes, gobierno).
-4.  **🚩 Banderas Rojas (Riesgos Altos)**: Cláusulas peligrosas, renuncias de derechos excesivas o retención indefinida.
-5.  **⏳ Retención y Derechos**: Cuánto tiempo guardan los datos y cómo borrarlos.
-6.  **✅ Recomendaciones de Seguridad**: 3 consejos prácticos para el usuario basados en este texto.
+## 🛡️ Resumen Ejecutivo
+(Máx 100 palabras) Una visión general del nivel de intrusión.
+
+## 🕵️ Datos Personales Recolectados
+Lista con viñetas (e.g., email, ubicación, IP, datos biométricos).
+
+## 📢 Compartición con Terceros
+¿A quién le venden o dan los datos? (Partners, anunciantes, gobierno).
+
+## 🚩 Banderas Rojas (Riesgos Altos)
+Cláusulas peligrosas, renuncias de derechos excesivas o retención indefinida.
+
+## ⏳ Retención y Derechos
+Cuánto tiempo guardan los datos y cómo borrarlos.
+
+## ✅ Recomendaciones de Seguridad
+3 consejos prácticos para el usuario basados en este texto.
 
 Si el texto proporcionado NO parece ser un término legal o política de privacidad, responde solamente: "ERROR_CONTEXTO: El texto proporcionado no parece ser un documento legal válido para analizar."`;
 
             try {
-                console.log('Enviando solicitud a la función...');
-
                 const response = await fetch("/.netlify/functions/analyze", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -433,17 +685,12 @@ Si el texto proporcionado NO parece ser un término legal o política de privaci
                     })
                 });
 
-                console.log('Respuesta recibida:', response.status);
-
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error('Error de la API:', errorData);
                     throw new Error(errorData.error || `Error ${response.status}`);
                 }
 
                 const data = await response.json();
-                console.log('Datos parseados correctamente');
-
                 const aiResponse = data.content;
 
                 if (aiResponse.includes('ERROR_CONTEXTO')) {
@@ -451,11 +698,13 @@ Si el texto proporcionado NO parece ser un término legal o política de privaci
                     return;
                 }
 
+                currentMarkdown = aiResponse;
+                currentCharCount = text.length;
                 displayResults(aiResponse, text.length);
 
             } catch (error) {
                 console.error('Error completo:', error);
-                alert(`❌ Error: ${error.message}\n\nPor favor, verifica:\n1. Que la variable GROQ_API_KEY esté configurada en Netlify\n2. Que tengas créditos disponibles en Groq\n3. Revisa la consola (F12) para más detalles`);
+                alert(`❌ Error: ${error.message}`);
             } finally {
                 analyzeBtn.disabled = false;
                 spinner.classList.remove('active');
@@ -466,11 +715,10 @@ Si el texto proporcionado NO parece ser un término legal o política de privaci
             const reportContent = document.getElementById('reportContent');
             const risksContent = document.getElementById('risksContent');
             const technicalData = document.getElementById('technicalData');
-            const downloadBtn = document.getElementById('downloadBtn');
 
             reportContent.innerHTML = parseMarkdownSimple(markdown);
 
-            const risksSection = markdown.match(/\*\*🚩 Banderas Rojas[\s\S]*?(?=\*\*⏳|\*\*✅|$)/);
+            const risksSection = markdown.match(/## 🚩 Banderas Rojas[\s\S]*?(?=## ⏳|## ✅|$)/);
             if (risksSection) {
                 risksContent.innerHTML = parseMarkdownSimple(risksSection[0]);
             } else {
@@ -484,9 +732,6 @@ Si el texto proporcionado NO parece ser un término legal o política de privaci
                 fecha_analisis: new Date().toLocaleString('es-MX')
             };
             technicalData.textContent = JSON.stringify(techData, null, 2);
-
-            const blob = new Blob([markdown], { type: 'text/markdown' });
-            downloadBtn.href = URL.createObjectURL(blob);
 
             results.classList.add('active');
             results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
