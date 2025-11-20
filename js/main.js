@@ -13,12 +13,15 @@ const elements = {
     charCount: document.getElementById('charCount'),
     analyzeBtn: document.getElementById('analyzeBtn'),
     loadingState: document.getElementById('loadingState'),
+    loadingText: document.getElementById('loadingText'), // Elemento nuevo para texto dinámico
     resultsSection: document.getElementById('resultsSection'),
     reportContent: document.getElementById('reportContent'),
     riskContent: document.getElementById('riskContent'),
     statChars: document.getElementById('statChars'),
     statModel: document.getElementById('statModel'),
-    statDate: document.getElementById('statDate')
+    statDate: document.getElementById('statDate'),
+    // NUEVO: Elemento de carga de archivo
+    pdfUpload: document.getElementById('pdfUpload')
 };
 
 /**
@@ -34,6 +37,64 @@ function init() {
  */
 function setupEventListeners() {
     elements.textarea.addEventListener('input', handleTextInput);
+    // NUEVO: Listener para subida de PDF
+    elements.pdfUpload.addEventListener('change', handlePdfUpload);
+}
+
+/**
+ * Maneja la subida y extracción de texto del PDF
+ */
+async function handlePdfUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+        alert('❌ Por favor, sube un archivo PDF válido.');
+        return;
+    }
+
+    try {
+        // Mostrar estado de carga visual
+        elements.loadingState.classList.add('active');
+        if(elements.loadingText) elements.loadingText.textContent = "Leyendo PDF...";
+        elements.resultsSection.classList.remove('active');
+        elements.analyzeBtn.disabled = true;
+
+        // Leer el archivo como ArrayBuffer
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Cargar el documento usando PDF.js
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        let fullText = "";
+
+        // Iterar sobre todas las páginas
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            fullText += pageText + "\n\n";
+        }
+
+        // Colocar el texto en el textarea
+        elements.textarea.value = fullText;
+        
+        // Disparar manualmente la validación del input
+        handleTextInput();
+        
+        // Restaurar UI
+        elements.loadingState.classList.remove('active');
+        if(elements.loadingText) elements.loadingText.textContent = "Analizando documento..."; // Reset texto
+        elements.analyzeBtn.disabled = false;
+
+    } catch (error) {
+        console.error('Error al leer PDF:', error);
+        alert('❌ Error al leer el archivo PDF. Asegúrate de que no esté protegido por contraseña.');
+        elements.loadingState.classList.remove('active');
+        elements.analyzeBtn.disabled = false;
+    }
+    
+    // Limpiar el input file para permitir subir el mismo archivo de nuevo si es necesario
+    event.target.value = '';
 }
 
 /**
@@ -41,7 +102,7 @@ function setupEventListeners() {
  */
 function handleTextInput() {
     const count = elements.textarea.value.length;
-    elements.charCount.textContent = count;
+    elements.charCount.textContent = count.toLocaleString(); // Formato de número
     elements.analyzeBtn.disabled = count < 50;
 }
 
@@ -66,6 +127,7 @@ function switchTab(index) {
  */
 function showLoading() {
     elements.loadingState.classList.add('active');
+    if(elements.loadingText) elements.loadingText.textContent = "Analizando documento...";
     elements.resultsSection.classList.remove('active');
     elements.analyzeBtn.disabled = true;
 }

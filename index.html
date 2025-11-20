@@ -6,19 +6,16 @@
     <meta name="description" content="Analiza políticas de privacidad con inteligencia artificial">
     <title>Privacy Guard - Análisis de Privacidad con IA</title>
     
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     
-    <!-- Librerías PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
-    <!-- Estilos -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <!-- Header -->
     <header class="header">
         <div class="header-content">
             <div class="logo-section">
@@ -31,27 +28,34 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="main-container">
-        <!-- Introducción -->
         <section class="intro-section">
             <h2 class="section-title">Protege tu privacidad con inteligencia</h2>
             <p class="section-description">
-                Analiza términos y condiciones en segundos. Nuestra IA identifica riesgos ocultos 
-                y te proporciona un análisis detallado en lenguaje claro.
+                Analiza términos y condiciones en segundos. Sube un PDF o pega el texto para identificar riesgos ocultos.
             </p>
         </section>
 
-        <!-- Input Section -->
         <section class="input-section">
             <div class="input-container">
-                <label for="privacyText" class="input-label">
-                    <span>Pega el texto de la política de privacidad</span>
-                </label>
+                <div class="input-header">
+                    <label for="privacyText" class="input-label">
+                        <span>Texto o Archivo PDF</span>
+                    </label>
+                    
+                    <input type="file" id="pdfUpload" accept=".pdf" hidden>
+                    <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">
+                        <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                        Subir PDF
+                    </button>
+                </div>
+
                 <textarea 
                     id="privacyText" 
                     class="text-input" 
-                    placeholder="Ejemplo: Al utilizar nuestro servicio, recopilamos tu nombre, correo electrónico..."
+                    placeholder="Pega el texto aquí o sube un archivo PDF..."
                     rows="10"
                 ></textarea>
                 <div class="input-footer">
@@ -67,16 +71,13 @@
             </button>
         </section>
 
-        <!-- Loading State -->
         <div id="loadingState" class="loading-state">
             <div class="loader"></div>
-            <p class="loading-text">Analizando documento...</p>
+            <p class="loading-text" id="loadingText">Analizando documento...</p>
             <p class="loading-subtext">Esto tomará unos segundos</p>
         </div>
 
-        <!-- Results Section -->
         <section id="resultsSection" class="results-section">
-            <!-- Success Alert -->
             <div class="alert-success">
                 <svg class="alert-icon" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
@@ -84,7 +85,6 @@
                 <span>Análisis completado exitosamente</span>
             </div>
 
-            <!-- Tabs Navigation -->
             <nav class="tabs-nav">
                 <button class="tab-btn active" onclick="switchTab(0)" data-tab="0">
                     <span class="tab-icon">📊</span>
@@ -100,9 +100,7 @@
                 </button>
             </nav>
 
-            <!-- Tab Contents -->
             <div class="tabs-content">
-                <!-- Tab 1: Reporte Completo -->
                 <div class="tab-panel active" data-panel="0">
                     <div class="report-content" id="reportContent"></div>
                     
@@ -116,7 +114,6 @@
                     </div>
                 </div>
 
-                <!-- Tab 2: Alertas de Riesgo -->
                 <div class="tab-panel" data-panel="1">
                     <div class="risk-alert-box">
                         <h3 class="risk-title">Puntos Críticos Detectados</h3>
@@ -127,7 +124,6 @@
                     <div class="risk-content" id="riskContent"></div>
                 </div>
 
-                <!-- Tab 3: Estadísticas -->
                 <div class="tab-panel" data-panel="2">
                     <div class="stats-grid">
                         <div class="stat-card">
@@ -160,7 +156,6 @@
         </section>
     </main>
 
-    <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
             <p class="footer-text">
@@ -170,9 +165,12 @@
         </div>
     </footer>
 
-    <!-- Scripts -->
     <script src="js/markdown-parser.js"></script>
     <script src="js/pdf-generator.js"></script>
     <script src="js/main.js"></script>
+    
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 </body>
 </html>

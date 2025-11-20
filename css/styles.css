@@ -649,3 +649,44 @@ body {
         font-size: 1.75rem;
     }
 }
+
+
+/* ============================================
+   INPUT HEADER & UPLOAD BUTTON (NUEVO)
+   ============================================ */
+.input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.input-header .input-label {
+    margin-bottom: 0; /* Reset del margen original para alineación */
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 0.5rem 1rem;
+    background: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-secondary:hover {
+    background: rgba(37, 99, 235, 0.05);
+    transform: translateY(-1px);
+}
+
+.btn-icon-sm {
+    width: 16px;
+    height: 16px;
+}
