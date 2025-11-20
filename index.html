@@ -17,7 +17,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
-        }   
+        }
 
         .container {
             max-width: 1200px;
@@ -431,7 +431,7 @@ Estructura OBLIGATORIA de la respuesta:
 Si el texto proporcionado NO parece ser un término legal o política de privacidad, responde solamente: "ERROR_CONTEXTO: El texto proporcionado no parece ser un documento legal válido para analizar."`;
 
             try {
-                const response = await fetch("/.netlify/functions/openrouter", {
+                const response = await fetch("/.netlify/functions/analyze", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -449,7 +449,7 @@ Si el texto proporcionado NO parece ser un término legal o política de privaci
                 }
 
                 const data = await response.json();
-                const aiResponse = data.choices[0].message.content;
+                const aiResponse = data.content;
 
                 if (aiResponse.includes('ERROR_CONTEXTO')) {
                     alert('El texto no parece ser un documento legal válido.');
