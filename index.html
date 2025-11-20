@@ -1,742 +1,184 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Guard AI</title>
+    <meta name="description" content="Analiza políticas de privacidad con inteligencia artificial">
+    <title>Privacy Guard - Análisis de Privacidad con IA</title>
     
-    <!-- Librerías para PDF -->
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Librerías PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
-
-        .content {
-            padding: 40px;
-        }
-
-        .info-box {
-            background: #eff6ff;
-            border-left: 5px solid #3b82f6;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }
-
-        .info-box h3 {
-            color: #1e293b;
-            margin-bottom: 10px;
-        }
-
-        .input-group {
-            margin-bottom: 25px;
-        }
-
-        .input-group label {
-            display: block;
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 10px;
-            font-size: 1rem;
-        }
-
-        textarea {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-family: inherit;
-            resize: vertical;
-            transition: border-color 0.3s;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .char-count {
-            text-align: right;
-            color: #64748b;
-            font-size: 0.9rem;
-            margin-top: 5px;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .spinner {
-            display: none;
-            text-align: center;
-            padding: 40px;
-        }
-
-        .spinner.active {
-            display: block;
-        }
-
-        .spinner-icon {
-            border: 4px solid #f3f4f6;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .results {
-            display: none;
-            margin-top: 30px;
-        }
-
-        .results.active {
-            display: block;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        .tab {
-            padding: 12px 24px;
-            background: transparent;
-            border: none;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-            font-weight: 600;
-            color: #64748b;
-            transition: all 0.3s;
-        }
-
-        .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-        }
-
-        .tab-content {
-            display: none;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            animation: fadeIn 0.3s;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        .alert {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .alert-success {
-            background: #d1fae5;
-            border-left: 5px solid #10b981;
-            color: #065f46;
-        }
-
-        .alert-error {
-            background: #fee2e2;
-            border-left: 5px solid #ef4444;
-            color: #991b1b;
-        }
-
-        .red-flag-box {
-            border: 1px solid #ef4444;
-            background-color: #fef2f2;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 5px solid #ef4444;
-            margin-bottom: 15px;
-        }
-
-        .download-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
-
-        .download-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 24px;
-            background: #10b981;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            border: none;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .download-btn:hover {
-            background: #059669;
-            transform: translateY(-2px);
-        }
-
-        .download-btn.secondary {
-            background: #3b82f6;
-        }
-
-        .download-btn.secondary:hover {
-            background: #2563eb;
-        }
-
-        .download-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .markdown-content {
-            line-height: 1.8;
-        }
-
-        .markdown-content h2 {
-            color: #1e293b;
-            margin: 25px 0 15px;
-            font-size: 1.5rem;
-        }
-
-        .markdown-content h3 {
-            color: #334155;
-            margin: 20px 0 10px;
-            font-size: 1.2rem;
-        }
-
-        .markdown-content ul {
-            margin-left: 20px;
-            margin-bottom: 15px;
-        }
-
-        .markdown-content li {
-            margin-bottom: 8px;
-        }
-
-        .markdown-content strong {
-            color: #0f172a;
-        }
-
-        /* Estilos para el PDF */
-        #pdf-content {
-            display: none;
-            background: white;
-            padding: 40px;
-            max-width: 800px;
-            margin: 0 auto;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-
-        #pdf-content h1 {
-            color: #0f172a;
-            font-size: 28px;
-            margin-bottom: 10px;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 10px;
-        }
-
-        #pdf-content h2 {
-            color: #1e293b;
-            font-size: 20px;
-            margin-top: 25px;
-            margin-bottom: 12px;
-        }
-
-        #pdf-content h3 {
-            color: #334155;
-            font-size: 16px;
-            margin-top: 15px;
-            margin-bottom: 8px;
-        }
-
-        #pdf-content p {
-            margin-bottom: 12px;
-            line-height: 1.6;
-            color: #1e293b;
-        }
-
-        #pdf-content ul {
-            margin-left: 20px;
-            margin-bottom: 15px;
-        }
-
-        #pdf-content li {
-            margin-bottom: 8px;
-            line-height: 1.5;
-        }
-
-        #pdf-content .pdf-header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 20px;
-        }
-
-        #pdf-content .pdf-footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 2px solid #e2e8f0;
-            text-align: center;
-            font-size: 12px;
-            color: #64748b;
-        }
-
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.8rem;
-            }
-
-            .content {
-                padding: 20px;
-            }
-
-            .tabs {
-                flex-direction: column;
-            }
-
-            .download-buttons {
-                flex-direction: column;
-            }
-
-            .download-btn {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-    </style>
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/styles.css">
 </head>
-
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Privacy Guard AI</h1>
-            <p>Analizador Inteligente de Términos y Condiciones</p>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-section">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <h1 class="logo-text">Privacy Guard</h1>
+            </div>
+            <p class="tagline">Análisis inteligente de políticas de privacidad</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <!-- Introducción -->
+        <section class="intro-section">
+            <h2 class="section-title">Protege tu privacidad con inteligencia</h2>
+            <p class="section-description">
+                Analiza términos y condiciones en segundos. Nuestra IA identifica riesgos ocultos 
+                y te proporciona un análisis detallado en lenguaje claro.
+            </p>
+        </section>
+
+        <!-- Input Section -->
+        <section class="input-section">
+            <div class="input-container">
+                <label for="privacyText" class="input-label">
+                    <span class="label-icon">📄</span>
+                    <span>Pega el texto de la política de privacidad</span>
+                </label>
+                <textarea 
+                    id="privacyText" 
+                    class="text-input" 
+                    placeholder="Ejemplo: Al utilizar nuestro servicio, recopilamos tu nombre, correo electrónico..."
+                    rows="10"
+                ></textarea>
+                <div class="input-footer">
+                    <span class="char-counter">
+                        <span id="charCount">0</span> caracteres
+                    </span>
+                    <span class="input-hint">Mínimo 50 caracteres</span>
+                </div>
+            </div>
+
+            <button id="analyzeBtn" class="btn-primary" onclick="analyzePrivacy()">
+                <span class="btn-icon">🔍</span>
+                <span>Analizar Documento</span>
+            </button>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-state">
+            <div class="loader"></div>
+            <p class="loading-text">Analizando documento...</p>
+            <p class="loading-subtext">Esto tomará unos segundos</p>
         </div>
 
-        <div class="content">
-            <div class="info-box">
-                <h3>Sobre esta herramienta</h3>
-                <p>Esta herramienta utiliza Inteligencia Artificial para analizar la "letra pequeña" de políticas de
-                    privacidad y términos de servicio. Tu texto se procesa de forma segura y no se almacena en nuestros
-                    servidores.</p>
+        <!-- Results Section -->
+        <section id="resultsSection" class="results-section">
+            <!-- Success Alert -->
+            <div class="alert-success">
+                <svg class="alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+                <span>Análisis completado exitosamente</span>
             </div>
 
-            <div class="input-group">
-                <label for="tcText">Pega el texto legal aquí:</label>
-                <textarea id="tcText" rows="12"
-                    placeholder="Ejemplo: 1. Introducción. Al utilizar este servicio, usted acepta..."></textarea>
-                <div class="char-count">Caracteres: <span id="charCount">0</span></div>
-            </div>
+            <!-- Tabs Navigation -->
+            <nav class="tabs-nav">
+                <button class="tab-btn active" onclick="switchTab(0)" data-tab="0">
+                    <span class="tab-icon">📊</span>
+                    <span>Reporte Completo</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab(1)" data-tab="1">
+                    <span class="tab-icon">⚠️</span>
+                    <span>Alertas de Riesgo</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab(2)" data-tab="2">
+                    <span class="tab-icon">📈</span>
+                    <span>Estadísticas</span>
+                </button>
+            </nav>
 
-            <button class="btn" id="analyzeBtn" onclick="analyzePrivacy()">
-                Analizar Privacidad
-            </button>
-
-            <div class="spinner" id="spinner">
-                <div class="spinner-icon"></div>
-                <p>La IA está analizando el documento...</p>
-            </div>
-
-            <div class="results" id="results">
-                <div class="alert alert-success">
-                    ✅ Análisis completado exitosamente
-                </div>
-
-                <div class="tabs">
-                    <button class="tab active" onclick="switchTab(0)">📊 Reporte Ejecutivo</button>
-                    <button class="tab" onclick="switchTab(1)">🚩 Riesgos Detectados</button>
-                    <button class="tab" onclick="switchTab(2)">📋 Datos Técnicos</button>
-                </div>
-
-                <div class="tab-content active" id="tab0">
-                    <div class="markdown-content" id="reportContent"></div>
-                    <div class="download-buttons">
-                        <button class="download-btn" onclick="downloadPDF()" id="pdfBtn">
-                            Descargar PDF
+            <!-- Tab Contents -->
+            <div class="tabs-content">
+                <!-- Tab 1: Reporte Completo -->
+                <div class="tab-panel active" data-panel="0">
+                    <div class="report-content" id="reportContent"></div>
+                    
+                    <div class="actions-bar">
+                        <button class="btn-download" onclick="downloadPDF()">
+                            <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            </svg>
+                            <span>Descargar PDF</span>
                         </button>
                     </div>
                 </div>
 
-                <div class="tab-content" id="tab1">
-                    <div class="red-flag-box">
-                        <h3>🚨 Zona de Alerta</h3>
-                        <p>Revisa las <strong>banderas rojas</strong> en el reporte para identificar los riesgos
-                            principales de este documento.</p>
+                <!-- Tab 2: Alertas de Riesgo -->
+                <div class="tab-panel" data-panel="1">
+                    <div class="risk-alert-box">
+                        <h3 class="risk-title">⚠️ Puntos Críticos Detectados</h3>
+                        <p class="risk-description">
+                            Revisa cuidadosamente las siguientes banderas rojas identificadas en el documento:
+                        </p>
                     </div>
-                    <div class="markdown-content" id="risksContent"></div>
+                    <div class="risk-content" id="riskContent"></div>
                 </div>
 
-                <div class="tab-content" id="tab2">
-                    <div style="background: white; padding: 20px; border-radius: 8px;">
-                        <h3>📊 Información del Análisis</h3>
-                        <pre id="technicalData"
-                            style="background: #f1f5f9; padding: 15px; border-radius: 5px; overflow-x: auto;"></pre>
+                <!-- Tab 3: Estadísticas -->
+                <div class="tab-panel" data-panel="2">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📝</div>
+                            <div class="stat-info">
+                                <span class="stat-label">Caracteres analizados</span>
+                                <span class="stat-value" id="statChars">-</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🤖</div>
+                            <div class="stat-info">
+                                <span class="stat-label">Modelo de IA</span>
+                                <span class="stat-value" id="statModel">-</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-info">
+                                <span class="stat-label">Fecha de análisis</span>
+                                <span class="stat-value" id="statDate">-</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-info">
+                                <span class="stat-label">Estado</span>
+                                <span class="stat-value stat-success">Completado</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p class="footer-text">
+                <strong>Privacy Guard</strong> · Tu privacidad es importante · 
+                Los documentos no se almacenan en nuestros servidores
+            </p>
         </div>
-    </div>
+    </footer>
 
-    <!-- Contenedor oculto para generar el PDF -->
-    <div id="pdf-content"></div>
-
-    <script>
-        const textarea = document.getElementById('tcText');
-        const charCount = document.getElementById('charCount');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const spinner = document.getElementById('spinner');
-        const results = document.getElementById('results');
-        
-        let currentMarkdown = '';
-        let currentCharCount = 0;
-
-        textarea.addEventListener('input', () => {
-            const count = textarea.value.length;
-            charCount.textContent = count;
-            analyzeBtn.disabled = count < 50;
-        });
-
-        function switchTab(index) {
-            document.querySelectorAll('.tab').forEach((tab, i) => {
-                tab.classList.toggle('active', i === index);
-            });
-            document.querySelectorAll('.tab-content').forEach((content, i) => {
-                content.classList.toggle('active', i === index);
-            });
-        }
-
-        function parseMarkdownSimple(text) {
-            return text
-                .replace(/### (.*?)$/gm, '<h3>$1</h3>')
-                .replace(/## (.*?)$/gm, '<h2>$1</h2>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\* (.*?)$/gm, '<li>$1</li>')
-                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-                .replace(/\n\n/g, '<br><br>');
-        }
-
-        async function downloadPDF() {
-            const pdfBtn = document.getElementById('pdfBtn');
-            pdfBtn.disabled = true;
-            pdfBtn.textContent = 'Generando PDF...';
-
-            try {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF('p', 'mm', 'a4');
-                
-                // Configuración
-                const margin = 20;
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const pageHeight = doc.internal.pageSize.getHeight();
-                const maxWidth = pageWidth - (margin * 2);
-                let yPosition = margin;
-
-                // Función para agregar nueva página si es necesario
-                function checkPageBreak(neededSpace) {
-                    if (yPosition + neededSpace > pageHeight - margin) {
-                        doc.addPage();
-                        yPosition = margin;
-                        return true;
-                    }
-                    return false;
-                }
-
-                // Header del PDF
-                doc.setFillColor(15, 23, 42);
-                doc.rect(0, 0, pageWidth, 40, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(24);
-                doc.setFont(undefined, 'bold');
-                doc.text('Privacy Guard AI', pageWidth / 2, 20, { align: 'center' });
-                doc.setFontSize(12);
-                doc.setFont(undefined, 'normal');
-                doc.text('Analisis de Politica de Privacidad', pageWidth / 2, 30, { align: 'center' });
-
-                yPosition = 50;
-
-                // Procesar el markdown
-                const lines = currentMarkdown.split('\n');
-                doc.setTextColor(0, 0, 0);
-
-                for (let i = 0; i < lines.length; i++) {
-                    let line = lines[i].trim();
-                    if (!line) continue;
-
-                    // Títulos H2
-                    if (line.startsWith('## ')) {
-                        checkPageBreak(15);
-                        doc.setFontSize(16);
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(30, 41, 59);
-                        const title = line.replace('## ', '').replace(/\*\*/g, '');
-                        doc.text(title, margin, yPosition);
-                        yPosition += 10;
-                    }
-                    // Títulos H3
-                    else if (line.startsWith('### ')) {
-                        checkPageBreak(12);
-                        doc.setFontSize(14);
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(51, 65, 85);
-                        const title = line.replace('### ', '').replace(/\*\*/g, '');
-                        doc.text(title, margin, yPosition);
-                        yPosition += 8;
-                    }
-                    // Listas
-                    else if (line.startsWith('* ') || line.startsWith('- ')) {
-                        checkPageBreak(10);
-                        doc.setFontSize(11);
-                        doc.setFont(undefined, 'normal');
-                        doc.setTextColor(30, 41, 59);
-                        const text = line.replace(/^[*-] /, '').replace(/\*\*/g, '');
-                        const splitText = doc.splitTextToSize('• ' + text, maxWidth - 10);
-                        doc.text(splitText, margin + 5, yPosition);
-                        yPosition += splitText.length * 6;
-                    }
-                    // Texto normal
-                    else {
-                        checkPageBreak(10);
-                        doc.setFontSize(11);
-                        doc.setFont(undefined, 'normal');
-                        doc.setTextColor(30, 41, 59);
-                        const text = line.replace(/\*\*/g, '');
-                        const splitText = doc.splitTextToSize(text, maxWidth);
-                        doc.text(splitText, margin, yPosition);
-                        yPosition += splitText.length * 6;
-                    }
-                }
-
-                // Footer
-                const totalPages = doc.internal.pages.length - 1;
-                for (let i = 1; i <= totalPages; i++) {
-                    doc.setPage(i);
-                    doc.setFontSize(9);
-                    doc.setTextColor(100, 116, 139);
-                    doc.text(
-                        `Generado por Privacy Guard AI - ${new Date().toLocaleDateString('es-MX')} - Página ${i} de ${totalPages}`,
-                        pageWidth / 2,
-                        pageHeight - 10,
-                        { align: 'center' }
-                    );
-                }
-
-                // Guardar el PDF
-                const fecha = new Date().toISOString().split('T')[0];
-                doc.save(`analisis_privacidad_${fecha}.pdf`);
-
-                pdfBtn.disabled = false;
-                pdfBtn.innerHTML = 'Descargar PDF';
-
-            } catch (error) {
-                console.error('Error generando PDF:', error);
-                alert('Error al generar el PDF. Por favor, intenta de nuevo.');
-                pdfBtn.disabled = false;
-                pdfBtn.innerHTML = 'Descargar PDF';
-            }
-        }
-
-        function downloadMarkdown() {
-            const blob = new Blob([currentMarkdown], { type: 'text/markdown' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const fecha = new Date().toISOString().split('T')[0];
-            a.href = url;
-            a.download = `analisis_privacidad_${fecha}.md`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        async function analyzePrivacy() {
-            const text = textarea.value.trim();
-
-            if (text.length < 50) {
-                alert('El texto es muy corto para un análisis significativo.');
-                return;
-            }
-
-            analyzeBtn.disabled = true;
-            spinner.classList.add('active');
-            results.classList.remove('active');
-
-            const systemPrompt = `Actúa como un experto senior en Ciberseguridad y Privacidad de Datos (CISO). 
-Tu tarea es analizar los siguientes "Términos y Condiciones" o "Política de Privacidad".
-
-Debes generar un reporte estructurado en formato MARKDOWN.
-El tono debe ser profesional pero comprensible para un usuario promedio.
-
-Estructura OBLIGATORIA de la respuesta:
-
-## Resumen Ejecutivo
-(Máx 100 palabras) Una visión general del nivel de intrusión.
-
-## Datos Personales Recolectados
-Lista con viñetas (e.g., email, ubicación, IP, datos biométricos).
-
-## Compartición con Terceros
-¿A quién le venden o dan los datos? (Partners, anunciantes, gobierno).
-
-## Banderas Rojas (Riesgos Altos)
-Cláusulas peligrosas, renuncias de derechos excesivas o retención indefinida.
-
-## Retención y Derechos
-Cuánto tiempo guardan los datos y cómo borrarlos.
-
-## Recomendaciones de Seguridad
-3 consejos prácticos para el usuario basados en este texto.
-
-Si el texto proporcionado NO parece ser un término legal o política de privacidad, responde solamente: "ERROR_CONTEXTO: El texto proporcionado no parece ser un documento legal válido para analizar."`;
-
-            try {
-                const response = await fetch("/.netlify/functions/analyze", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        systemPrompt: systemPrompt,
-                        userText: text
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Error ${response.status}`);
-                }
-
-                const data = await response.json();
-                const aiResponse = data.content;
-
-                if (aiResponse.includes('ERROR_CONTEXTO')) {
-                    alert('❌ El texto no parece ser un documento legal válido.');
-                    return;
-                }
-
-                currentMarkdown = aiResponse;
-                currentCharCount = text.length;
-                displayResults(aiResponse, text.length);
-
-            } catch (error) {
-                console.error('Error completo:', error);
-                alert(`❌ Error: ${error.message}`);
-            } finally {
-                analyzeBtn.disabled = false;
-                spinner.classList.remove('active');
-            }
-        }
-
-        function displayResults(markdown, charCount) {
-            const reportContent = document.getElementById('reportContent');
-            const risksContent = document.getElementById('risksContent');
-            const technicalData = document.getElementById('technicalData');
-
-            reportContent.innerHTML = parseMarkdownSimple(markdown);
-
-            const risksSection = markdown.match(/## 🚩 Banderas Rojas[\s\S]*?(?=## ⏳|## ✅|$)/);
-            if (risksSection) {
-                risksContent.innerHTML = parseMarkdownSimple(risksSection[0]);
-            } else {
-                risksContent.innerHTML = '<p>No se detectaron banderas rojas específicas en el análisis.</p>';
-            }
-
-            const techData = {
-                caracteres_analizados: charCount,
-                modelo: "Llama 3.3 70B (via Groq)",
-                estado: "Procesado",
-                fecha_analisis: new Date().toLocaleString('es-MX')
-            };
-            technicalData.textContent = JSON.stringify(techData, null, 2);
-
-            results.classList.add('active');
-            results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-    </script>
+    <!-- Scripts -->
+    <script src="js/markdown-parser.js"></script>
+    <script src="js/pdf-generator.js"></script>
+    <script src="js/main.js"></script>
 </body>
-
 </html>
