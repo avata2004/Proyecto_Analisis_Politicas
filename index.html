@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️ Privacy Guard AI</title>
+    <title>Privacy Guard AI</title>
     
     <!-- Librerías para PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -398,32 +398,32 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛡️ Privacy Guard AI</h1>
+            <h1>Privacy Guard AI</h1>
             <p>Analizador Inteligente de Términos y Condiciones</p>
         </div>
 
         <div class="content">
             <div class="info-box">
-                <h3>ℹ️ Sobre esta herramienta</h3>
+                <h3>Sobre esta herramienta</h3>
                 <p>Esta herramienta utiliza Inteligencia Artificial para analizar la "letra pequeña" de políticas de
                     privacidad y términos de servicio. Tu texto se procesa de forma segura y no se almacena en nuestros
                     servidores.</p>
             </div>
 
             <div class="input-group">
-                <label for="tcText">📄 Pega el texto legal aquí:</label>
+                <label for="tcText">Pega el texto legal aquí:</label>
                 <textarea id="tcText" rows="12"
                     placeholder="Ejemplo: 1. Introducción. Al utilizar este servicio, usted acepta..."></textarea>
                 <div class="char-count">Caracteres: <span id="charCount">0</span></div>
             </div>
 
             <button class="btn" id="analyzeBtn" onclick="analyzePrivacy()">
-                🔍 Analizar Privacidad
+                Analizar Privacidad
             </button>
 
             <div class="spinner" id="spinner">
                 <div class="spinner-icon"></div>
-                <p>🕵️ La IA está analizando el documento...</p>
+                <p>La IA está analizando el documento...</p>
             </div>
 
             <div class="results" id="results">
@@ -441,7 +441,7 @@
                     <div class="markdown-content" id="reportContent"></div>
                     <div class="download-buttons">
                         <button class="download-btn" onclick="downloadPDF()" id="pdfBtn">
-                            📥 Descargar PDF
+                            Descargar PDF
                         </button>
                     </div>
                 </div>
@@ -507,7 +507,7 @@
         async function downloadPDF() {
             const pdfBtn = document.getElementById('pdfBtn');
             pdfBtn.disabled = true;
-            pdfBtn.textContent = '⏳ Generando PDF...';
+            pdfBtn.textContent = 'Generando PDF...';
 
             try {
                 const { jsPDF } = window.jspdf;
@@ -618,9 +618,9 @@
 
             } catch (error) {
                 console.error('Error generando PDF:', error);
-                alert('❌ Error al generar el PDF. Por favor, intenta de nuevo.');
+                alert('Error al generar el PDF. Por favor, intenta de nuevo.');
                 pdfBtn.disabled = false;
-                pdfBtn.innerHTML = '📥 Descargar PDF';
+                pdfBtn.innerHTML = 'Descargar PDF';
             }
         }
 
@@ -639,7 +639,7 @@
             const text = textarea.value.trim();
 
             if (text.length < 50) {
-                alert('⚠️ El texto es muy corto para un análisis significativo.');
+                alert('El texto es muy corto para un análisis significativo.');
                 return;
             }
 
@@ -655,22 +655,22 @@ El tono debe ser profesional pero comprensible para un usuario promedio.
 
 Estructura OBLIGATORIA de la respuesta:
 
-## 🛡️ Resumen Ejecutivo
+## Resumen Ejecutivo
 (Máx 100 palabras) Una visión general del nivel de intrusión.
 
-## 🕵️ Datos Personales Recolectados
+## Datos Personales Recolectados
 Lista con viñetas (e.g., email, ubicación, IP, datos biométricos).
 
-## 📢 Compartición con Terceros
+## Compartición con Terceros
 ¿A quién le venden o dan los datos? (Partners, anunciantes, gobierno).
 
-## 🚩 Banderas Rojas (Riesgos Altos)
+## Banderas Rojas (Riesgos Altos)
 Cláusulas peligrosas, renuncias de derechos excesivas o retención indefinida.
 
-## ⏳ Retención y Derechos
+## Retención y Derechos
 Cuánto tiempo guardan los datos y cómo borrarlos.
 
-## ✅ Recomendaciones de Seguridad
+## Recomendaciones de Seguridad
 3 consejos prácticos para el usuario basados en este texto.
 
 Si el texto proporcionado NO parece ser un término legal o política de privacidad, responde solamente: "ERROR_CONTEXTO: El texto proporcionado no parece ser un documento legal válido para analizar."`;
