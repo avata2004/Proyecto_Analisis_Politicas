@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,7 +24,7 @@
             margin: 0 auto;
             background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             overflow: hidden;
         }
 
@@ -140,8 +141,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .results {
@@ -189,8 +195,13 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         .alert {
@@ -274,15 +285,18 @@
             .header h1 {
                 font-size: 1.8rem;
             }
+
             .content {
                 padding: 20px;
             }
+
             .tabs {
                 flex-direction: column;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -293,16 +307,15 @@
         <div class="content">
             <div class="info-box">
                 <h3>Sobre esta herramienta</h3>
-                <p>Esta herramienta utiliza Inteligencia Artificial para analizar la "letra pequeña" de políticas de privacidad y términos de servicio. Tu texto se procesa de forma segura y no se almacena en nuestros servidores.</p>
+                <p>Esta herramienta utiliza Inteligencia Artificial para analizar la "letra pequeña" de políticas de
+                    privacidad y términos de servicio. Tu texto se procesa de forma segura y no se almacena en nuestros
+                    servidores.</p>
             </div>
 
             <div class="input-group">
                 <label for="tcText">Pega el texto legal aquí:</label>
-                <textarea 
-                    id="tcText" 
-                    rows="12" 
-                    placeholder="Ejemplo: 1. Introducción. Al utilizar este servicio, usted acepta..."
-                ></textarea>
+                <textarea id="tcText" rows="12"
+                    placeholder="Ejemplo: 1. Introducción. Al utilizar este servicio, usted acepta..."></textarea>
                 <div class="char-count">Caracteres: <span id="charCount">0</span></div>
             </div>
 
@@ -336,7 +349,8 @@
                 <div class="tab-content" id="tab1">
                     <div class="red-flag-box">
                         <h3>Zona de Alerta</h3>
-                        <p>Revisa las <strong>banderas rojas</strong> en el reporte para identificar los riesgos principales de este documento.</p>
+                        <p>Revisa las <strong>banderas rojas</strong> en el reporte para identificar los riesgos
+                            principales de este documento.</p>
                     </div>
                     <div class="markdown-content" id="risksContent"></div>
                 </div>
@@ -344,7 +358,8 @@
                 <div class="tab-content" id="tab2">
                     <div style="background: white; padding: 20px; border-radius: 8px;">
                         <h3>Información del Análisis</h3>
-                        <pre id="technicalData" style="background: #f1f5f9; padding: 15px; border-radius: 5px; overflow-x: auto;"></pre>
+                        <pre id="technicalData"
+                            style="background: #f1f5f9; padding: 15px; border-radius: 5px; overflow-x: auto;"></pre>
                     </div>
                 </div>
             </div>
@@ -352,7 +367,6 @@
     </div>
 
     <script>
-        const OPENROUTER_API_KEY = "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";
         const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
         const AI_MODEL = "qwen/qwen-2.5-coder-32b-instruct:free";
 
@@ -389,7 +403,7 @@
 
         async function analyzePrivacy() {
             const text = textarea.value.trim();
-            
+
             if (text.length < 50) {
                 alert('El texto es muy corto para un análisis significativo.');
                 return;
@@ -417,28 +431,18 @@ Estructura OBLIGATORIA de la respuesta:
 Si el texto proporcionado NO parece ser un término legal o política de privacidad, responde solamente: "ERROR_CONTEXTO: El texto proporcionado no parece ser un documento legal válido para analizar."`;
 
             try {
-                const response = await fetch(OPENROUTER_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                        'HTTP-Referer': window.location.href,
-                        'X-Title': 'Privacy Guard AI'
-                    },
+                const response = await fetch("/.netlify/functions/openrouter", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         model: AI_MODEL,
                         messages: [
-                            {
-                                role: 'system',
-                                content: systemPrompt
-                            },
-                            {
-                                role: 'user',
-                                content: `TEXTO A ANALIZAR:\n${text}`
-                            }
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: `TEXTO A ANALIZAR:\n${text}` }
                         ]
                     })
                 });
+
 
                 if (!response.ok) {
                     throw new Error(`Error de API: ${response.status} ${response.statusText}`);
@@ -494,4 +498,5 @@ Si el texto proporcionado NO parece ser un término legal o política de privaci
         }
     </script>
 </body>
+
 </html>
