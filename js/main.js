@@ -8,7 +8,7 @@ let currentMarkdown = '';
 let currentCharCount = 0;
 
 // Configuración
-const CHUNK_SIZE = 15000; // 15k caracteres por petición (seguro para timeout de 10s)
+const CHUNK_SIZE = 6000; // 15k caracteres por petición (seguro para timeout de 10s)
 
 // Elementos del DOM
 const elements = {
@@ -161,26 +161,31 @@ async function analyzeLargeDocument(text) {
             const progressMsg = `Analizando parte ${i + 1} de ${chunks.length}...`;
             if(elements.loadingText) elements.loadingText.textContent = progressMsg;
             
+            // --- CAMBIO: Pequeña pausa de 1 segundo entre peticiones para estabilidad ---
+            if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
+
             // Llamada a la API
             try {
-                // Añadimos contexto al prompt para que la IA sepa que es una parte
                 const chunkContext = `(Parte ${i + 1} de ${chunks.length} del documento). `;
                 const result = await callAnalyzeAPI(chunks[i], chunkContext);
                 
-                // Agregar cabecera visual para separar secciones
                 finalReport += `\n\n# 📑 ANÁLISIS DE LA SECCIÓN ${i + 1}\n---\n${result}`;
             
             } catch (err) {
                 console.warn(`Error en parte ${i+1}`, err);
-                finalReport += `\n\n# ❌ ERROR EN SECCIÓN ${i + 1}\nNo se pudo analizar esta sección por timeout o error de red.\n`;
+                finalReport += `\n\n# ❌ ERROR EN SECCIÓN ${i + 1}\nNo se pudo analizar esta sección por timeout.\n`;
                 hasErrors = true;
             }
         }
 
         if (!finalReport.trim()) throw new Error("No se pudo obtener ningún resultado.");
 
+        // Mensaje final al usuario
         if (hasErrors) {
-            alert("⚠️ Algunas secciones no pudieron ser analizadas correctamente, pero se generó el reporte parcial.");
+            alert("⚠️ Algunas secciones complejas tardaron demasiado, pero hemos generado el reporte con la información disponible.");
+        } else {
+            // Si todo salió perfecto (opcional)
+            console.log("Análisis completo sin errores");
         }
 
         processFinalResult(finalReport, text.length);
