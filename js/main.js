@@ -1,14 +1,16 @@
 /**
  * Privacy Guard - Main Application Logic
- * Gestiona el flujo principal de la aplicación con soporte para documentos largos (Chunking)
+ * Versión optimizada para Netlify Free Tier (Timeouts estrictos)
  */
 
 // Variables globales
 let currentMarkdown = '';
 let currentCharCount = 0;
 
-// Configuración
-const CHUNK_SIZE = 6000; // 15k caracteres por petición (seguro para timeout de 10s)
+// CONFIGURACIÓN CRÍTICA PARA NETLIFY FREE
+// 3500 chars = ~800 tokens. Esto da margen para que la IA responda en <10s.
+const CHUNK_SIZE = 3500; 
+const MAX_RETRIES = 2; // Intentos por bloque si falla
 
 // Elementos del DOM
 const elements = {
@@ -41,7 +43,7 @@ function setupEventListeners() {
 }
 
 // ==========================================
-// LÓGICA DE PDF (Sin cambios mayores)
+// LÓGICA DE PDF
 // ==========================================
 async function handlePdfUpload(event) {
     const file = event.target.files[0];
@@ -83,19 +85,15 @@ function handleTextInput() {
 }
 
 // ==========================================
-// LÓGICA DE ANÁLISIS (MODIFICADA PARA CHUNKING)
+// LÓGICA DE ANÁLISIS ROBUSTA
 // ==========================================
 
-/**
- * Divide el texto en bloques seguros sin cortar palabras
- */
 function splitTextSafe(text, maxLength) {
     const chunks = [];
     let currentChunk = '';
-    const paragraphs = text.split('\n'); // Dividir por párrafos primero
+    const paragraphs = text.split('\n');
 
     for (let paragraph of paragraphs) {
-        // Si un solo párrafo es gigante, lo cortamos por palabras
         if (paragraph.length > maxLength) {
             const words = paragraph.split(' ');
             for (let word of words) {
@@ -106,7 +104,6 @@ function splitTextSafe(text, maxLength) {
                 currentChunk += word + ' ';
             }
         } else {
-            // Lógica normal por párrafos
             if ((currentChunk + paragraph).length > maxLength) {
                 chunks.push(currentChunk);
                 currentChunk = '';
@@ -122,7 +119,6 @@ async function analyzePrivacy() {
     const text = elements.textarea.value.trim();
     if (text.length < 50) return;
 
-    // 1. Decidir estrategia según longitud
     if (text.length > CHUNK_SIZE) {
         await analyzeLargeDocument(text);
     } else {
@@ -130,9 +126,6 @@ async function analyzePrivacy() {
     }
 }
 
-/**
- * Estrategia A: Documento Corto (Una sola petición)
- */
 async function analyzeSingleBlock(text) {
     toggleLoading(true, "Analizando documento...");
     try {
@@ -146,46 +139,61 @@ async function analyzeSingleBlock(text) {
 }
 
 /**
- * Estrategia B: Documento Largo (Múltiples peticiones)
+ * Procesa documentos largos con reintentos automáticos
  */
 async function analyzeLargeDocument(text) {
     const chunks = splitTextSafe(text, CHUNK_SIZE);
     let finalReport = "";
     let hasErrors = false;
+    let failedSections = [];
 
     toggleLoading(true, `Iniciando análisis de ${chunks.length} secciones...`);
 
     try {
         for (let i = 0; i < chunks.length; i++) {
-            // Actualizar UI
-            const progressMsg = `Analizando parte ${i + 1} de ${chunks.length}...`;
-            if(elements.loadingText) elements.loadingText.textContent = progressMsg;
-            
-            // --- CAMBIO: Pequeña pausa de 1 segundo entre peticiones para estabilidad ---
-            if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
+            let success = false;
+            let attempt = 1;
+            const chunkContext = `(Parte ${i + 1} de ${chunks.length}). Sé conciso.`;
 
-            // Llamada a la API
-            try {
-                const chunkContext = `(Parte ${i + 1} de ${chunks.length} del documento). `;
-                const result = await callAnalyzeAPI(chunks[i], chunkContext);
-                
-                finalReport += `\n\n# 📑 ANÁLISIS DE LA SECCIÓN ${i + 1}\n---\n${result}`;
-            
-            } catch (err) {
-                console.warn(`Error en parte ${i+1}`, err);
-                finalReport += `\n\n# ❌ ERROR EN SECCIÓN ${i + 1}\nNo se pudo analizar esta sección por timeout.\n`;
+            // Pausa de seguridad entre bloques (evita rate limits)
+            if (i > 0) await new Promise(r => setTimeout(r, 2000));
+
+            // BUCLE DE REINTENTOS
+            while (!success && attempt <= MAX_RETRIES) {
+                try {
+                    // Actualizar UI con número de intento
+                    const attemptMsg = attempt > 1 ? ` (Reintento ${attempt})` : "";
+                    if(elements.loadingText) {
+                        elements.loadingText.textContent = `Analizando parte ${i + 1} de ${chunks.length}${attemptMsg}...`;
+                    }
+
+                    const result = await callAnalyzeAPI(chunks[i], chunkContext);
+                    finalReport += `\n\n# 📑 ANÁLISIS PARTE ${i + 1}\n---\n${result}`;
+                    success = true; // ¡Éxito! Salimos del while
+
+                } catch (err) {
+                    console.warn(`Fallo en parte ${i+1}, intento ${attempt}`, err);
+                    attempt++;
+                    
+                    // Si falló, esperamos 2 segundos extra antes de reintentar
+                    if (attempt <= MAX_RETRIES) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+            }
+
+            // Si después de los intentos sigue fallando:
+            if (!success) {
+                finalReport += `\n\n# ❌ ERROR EN PARTE ${i + 1}\nSección omitida por tiempo de espera.\n`;
                 hasErrors = true;
+                failedSections.push(i + 1);
             }
         }
 
         if (!finalReport.trim()) throw new Error("No se pudo obtener ningún resultado.");
 
-        // Mensaje final al usuario
         if (hasErrors) {
-            alert("⚠️ Algunas secciones complejas tardaron demasiado, pero hemos generado el reporte con la información disponible.");
-        } else {
-            // Si todo salió perfecto (opcional)
-            console.log("Análisis completo sin errores");
+            alert(`⚠️ Análisis parcial completado.\nLas secciones ${failedSections.join(', ')} no pudieron procesarse por lentitud del servidor.`);
         }
 
         processFinalResult(finalReport, text.length);
@@ -197,21 +205,21 @@ async function analyzeLargeDocument(text) {
     }
 }
 
-/**
- * Llamada genérica a la API
- */
 async function callAnalyzeAPI(textChunk, contextNote = "") {
-    const systemPrompt = `Actúa como experto CISO. Analiza este fragmento de Términos/Privacidad.
-    ${contextNote ? "NOTA: Este texto es solo una sección de un documento más grande. " : ""}
+    // Prompt optimizado para ser más rápido (menos verboso)
+    const systemPrompt = `Eres CISO. Analizas una SECCIÓN de una política de privacidad.
+    ${contextNote}
     
-    Genera un reporte en MARKDOWN. Estructura:
-    ## Resumen Ejecutivo
-    ## Datos Personales Recolectados
-    ## Compartición con Terceros
-    ## Banderas Rojas (Riesgos Altos)
-    ## Retención y Derechos
+    Responde en MARKDOWN. Sé MUY BREVE y directo para evitar timeout.
     
-    Si el texto no tiene sentido legal, responde "ERROR_CONTEXTO".`;
+    Estructura requerida:
+    ## Datos Personales (Solo de esta sección)
+    ## Terceros (Solo si menciona compartir datos)
+    ## Banderas Rojas (Riesgos críticos en esta sección)
+    ## Retención (Si se menciona)
+
+    Si la sección no tiene información relevante, responde: "Sin hallazgos críticos en esta sección."
+    Si no es texto legal, responde "ERROR_CONTEXTO".`;
 
     const response = await fetch("/.netlify/functions/analyze", {
         method: "POST",
@@ -222,34 +230,32 @@ async function callAnalyzeAPI(textChunk, contextNote = "") {
         })
     });
 
-    if (!response.ok) {
-        throw new Error(`Error API: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Timeout o Error ${response.status}`);
 
     const data = await response.json();
-    if (data.content.includes('ERROR_CONTEXTO')) {
-        throw new Error("Texto no válido detectado.");
-    }
+    if (data.content.includes('ERROR_CONTEXTO')) throw new Error("Texto inválido");
+    
     return data.content;
 }
 
-/**
- * Procesa y muestra los resultados finales
- */
 function processFinalResult(markdown, totalChars) {
     currentMarkdown = markdown;
     currentCharCount = totalChars;
 
-    // Renderizar Markdown completo
     elements.reportContent.innerHTML = parseMarkdown(markdown);
 
-    // Extraer TODAS las banderas rojas de todas las secciones
-    const allRisks = markdown.match(/## Banderas Rojas[\s\S]*?(?=## Retención|## |$)/g);
+    // Regex ajustado para capturar mejor las secciones
+    const allRisks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/g);
     
     if (allRisks && allRisks.length > 0) {
-        // Unir y limpiar banderas rojas repetidas
-        const riskHtml = allRisks.map(riskBlock => parseMarkdown(riskBlock)).join('<hr class="risk-separator">');
-        elements.riskContent.innerHTML = riskHtml;
+        // Filtramos secciones vacías o repetitivas
+        const validRisks = allRisks.filter(r => r.length > 25 && !r.includes("Sin hallazgos"));
+        
+        if (validRisks.length > 0) {
+            elements.riskContent.innerHTML = validRisks.map(r => parseMarkdown(r)).join('<hr class="risk-separator">');
+        } else {
+            elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se encontraron riesgos críticos específicos.</p>';
+        }
     } else {
         elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se detectaron banderas rojas críticas.</p>';
     }
@@ -258,10 +264,6 @@ function processFinalResult(markdown, totalChars) {
     showResults();
     switchTab(0);
 }
-
-// ==========================================
-// UTILIDADES DE UI
-// ==========================================
 
 function toggleLoading(show, text = "Cargando...") {
     if (show) {
@@ -295,7 +297,6 @@ function switchTab(index) {
 
 function updateStatistics(charCount) {
     if(elements.statChars) elements.statChars.textContent = charCount.toLocaleString();
-    // Eliminamos referencia a statModel para evitar errores
     if(elements.statDate) {
         elements.statDate.textContent = new Date().toLocaleDateString('es-MX', {
             year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -309,7 +310,6 @@ function handleError(error) {
     toggleLoading(false);
 }
 
-// Inicializar
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
