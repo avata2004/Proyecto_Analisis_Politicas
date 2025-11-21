@@ -1,16 +1,15 @@
 /**
  * Privacy Guard - Main Application Logic
- * Versión optimizada para Netlify Free Tier (Timeouts estrictos)
+ * Versión: Chunking + Consolidación Final (Map-Reduce)
  */
 
 // Variables globales
 let currentMarkdown = '';
 let currentCharCount = 0;
 
-// CONFIGURACIÓN CRÍTICA PARA NETLIFY FREE
-// 3500 chars = ~800 tokens. Esto da margen para que la IA responda en <10s.
-const CHUNK_SIZE = 3500; 
-const MAX_RETRIES = 2; // Intentos por bloque si falla
+// Configuración
+const CHUNK_SIZE = 3500; // Seguro para timeouts
+const MAX_RETRIES = 2; 
 
 // Elementos del DOM
 const elements = {
@@ -27,9 +26,6 @@ const elements = {
     pdfUpload: document.getElementById('pdfUpload')
 };
 
-/**
- * Inicialización
- */
 function init() {
     setupEventListeners();
     hideResults();
@@ -85,7 +81,7 @@ function handleTextInput() {
 }
 
 // ==========================================
-// LÓGICA DE ANÁLISIS ROBUSTA
+// LÓGICA DE ANÁLISIS "MAP-REDUCE"
 // ==========================================
 
 function splitTextSafe(text, maxLength) {
@@ -129,7 +125,18 @@ async function analyzePrivacy() {
 async function analyzeSingleBlock(text) {
     toggleLoading(true, "Analizando documento...");
     try {
-        const result = await callAnalyzeAPI(text, "General");
+        // Prompt estándar para documentos cortos
+        const prompt = `Actúa como CISO. Analiza este documento legal.
+        Genera un reporte MARKDOWN:
+        ## Resumen Ejecutivo
+        ## Datos Personales Recolectados
+        ## Compartición con Terceros
+        ## Banderas Rojas
+        ## Retención y Derechos
+        ## Recomendaciones
+        `;
+        
+        const result = await callAnalyzeAPI(text, prompt);
         processFinalResult(result, text.length);
     } catch (error) {
         handleError(error);
@@ -139,99 +146,135 @@ async function analyzeSingleBlock(text) {
 }
 
 /**
- * Procesa documentos largos con reintentos automáticos
+ * Estrategia Map-Reduce: 
+ * 1. Analiza cada trozo para extraer datos (Map)
+ * 2. Envía todos los datos extraídos para crear un resumen final (Reduce)
  */
 async function analyzeLargeDocument(text) {
     const chunks = splitTextSafe(text, CHUNK_SIZE);
-    let finalReport = "";
-    let hasErrors = false;
-    let failedSections = [];
+    let intermediateResults = []; // Aquí guardamos las notas de cada sección
 
     toggleLoading(true, `Iniciando análisis de ${chunks.length} secciones...`);
 
     try {
+        // FASE 1: EXTRACCIÓN (MAP)
         for (let i = 0; i < chunks.length; i++) {
             let success = false;
             let attempt = 1;
-            const chunkContext = `(Parte ${i + 1} de ${chunks.length}). Sé conciso.`;
+            
+            // Prompt enfocado en EXTRACCIÓN DE DATOS (no en formato final)
+            const chunkPrompt = `Analiza esta SECCIÓN (${i+1}/${chunks.length}) de un contrato.
+            Extrae SOLAMENTE en lista de bullets:
+            - Datos personales específicos mencionados.
+            - Terceros con quienes se comparten datos.
+            - Cláusulas abusivas o riesgos (Banderas Rojas).
+            - Periodos de retención.
+            Sé muy conciso. No escribas introducciones.`;
 
-            // Pausa de seguridad entre bloques (evita rate limits)
-            if (i > 0) await new Promise(r => setTimeout(r, 2000));
+            // Pausa entre peticiones
+            if (i > 0) await new Promise(r => setTimeout(r, 1500));
 
-            // BUCLE DE REINTENTOS
             while (!success && attempt <= MAX_RETRIES) {
                 try {
-                    // Actualizar UI con número de intento
-                    const attemptMsg = attempt > 1 ? ` (Reintento ${attempt})` : "";
                     if(elements.loadingText) {
-                        elements.loadingText.textContent = `Analizando parte ${i + 1} de ${chunks.length}${attemptMsg}...`;
+                        elements.loadingText.textContent = `Analizando parte ${i + 1} de ${chunks.length}...`;
                     }
 
-                    const result = await callAnalyzeAPI(chunks[i], chunkContext);
-                    finalReport += `\n\n# 📑 ANÁLISIS PARTE ${i + 1}\n---\n${result}`;
-                    success = true; // ¡Éxito! Salimos del while
-
+                    const result = await callAnalyzeAPI(chunks[i], chunkPrompt);
+                    intermediateResults.push(`--- NOTAS SECCIÓN ${i+1} ---\n${result}`);
+                    success = true;
                 } catch (err) {
-                    console.warn(`Fallo en parte ${i+1}, intento ${attempt}`, err);
+                    console.warn(`Fallo parte ${i+1}`, err);
                     attempt++;
-                    
-                    // Si falló, esperamos 2 segundos extra antes de reintentar
-                    if (attempt <= MAX_RETRIES) {
-                        await new Promise(r => setTimeout(r, 2000));
-                    }
+                    if (attempt <= MAX_RETRIES) await new Promise(r => setTimeout(r, 2000));
                 }
             }
-
-            // Si después de los intentos sigue fallando:
-            if (!success) {
-                finalReport += `\n\n# ❌ ERROR EN PARTE ${i + 1}\nSección omitida por tiempo de espera.\n`;
-                hasErrors = true;
-                failedSections.push(i + 1);
-            }
         }
 
-        if (!finalReport.trim()) throw new Error("No se pudo obtener ningún resultado.");
-
-        if (hasErrors) {
-            alert(`⚠️ Análisis parcial completado.\nLas secciones ${failedSections.join(', ')} no pudieron procesarse por lentitud del servidor.`);
+        // FASE 2: CONSOLIDACIÓN (REDUCE)
+        if (intermediateResults.length > 0) {
+            await generateFinalMasterReport(intermediateResults, text.length);
+        } else {
+            throw new Error("No se pudo extraer información de ninguna sección.");
         }
-
-        processFinalResult(finalReport, text.length);
 
     } catch (error) {
         handleError(error);
+        toggleLoading(false);
+    }
+}
+
+/**
+ * Genera el reporte final consolidado
+ */
+async function generateFinalMasterReport(notesArray, totalChars) {
+    if(elements.loadingText) elements.loadingText.textContent = "Unificando resultados y generando reporte final...";
+    
+    // Unimos todas las notas en un solo texto
+    const allNotes = notesArray.join("\n\n");
+
+    // Prompt de consolidación
+    const masterPrompt = `Actúa como CISO experto. A continuación te doy las NOTAS EXTRAÍDAS de varias secciones de un documento legal largo.
+    
+    Tu tarea es UNIFICAR y RESUMIR estas notas en un único reporte coherente.
+    IMPORTANTE:
+    - Elimina duplicados (ej: si "email" aparece en 5 secciones, ponlo una sola vez).
+    - Si hay banderas rojas repetidas, únelas.
+    - Mantén el formato MARKDOWN estricto.
+
+    Estructura requerida:
+    ## Resumen Ejecutivo
+    (Visión global del riesgo)
+    
+    ## Datos Personales Recolectados
+    (Lista unificada y limpia)
+
+    ## Compartición con Terceros
+    (Lista unificada de quién recibe los datos)
+
+    ## Banderas Rojas (Riesgos Altos)
+    (Las cláusulas más peligrosas encontradas en todo el documento)
+
+    ## Retención y Derechos
+    (Resumen de tiempos y cómo borrar datos)
+
+    ## Recomendaciones de Seguridad
+    (3 consejos finales)
+
+    AQUÍ ESTÁN LAS NOTAS A PROCESAR:
+    `;
+
+    try {
+        // Enviamos las notas a la IA para que escriba el reporte final
+        // Nota: Usamos las notas como "userText"
+        const finalReport = await callAnalyzeAPI(allNotes, masterPrompt);
+        
+        processFinalResult(finalReport, totalChars);
+    } catch (error) {
+        // Si falla la consolidación (timeout), mostramos las notas crudas como fallback
+        console.error("Error en consolidación final:", error);
+        alert("⚠️ El documento es muy complejo. Se mostrarán las notas de cada sección sin resumir.");
+        const rawReport = "# ⚠️ Reporte No Consolidado\n" + allNotes;
+        processFinalResult(rawReport, totalChars);
     } finally {
         toggleLoading(false);
     }
 }
 
-async function callAnalyzeAPI(textChunk, contextNote = "") {
-    // Prompt optimizado para ser más rápido (menos verboso)
-    const systemPrompt = `Eres CISO. Analizas una SECCIÓN de una política de privacidad.
-    ${contextNote}
-    
-    Responde en MARKDOWN. Sé MUY BREVE y directo para evitar timeout.
-    
-    Estructura requerida:
-    ## Datos Personales (Solo de esta sección)
-    ## Terceros (Solo si menciona compartir datos)
-    ## Banderas Rojas (Riesgos críticos en esta sección)
-    ## Retención (Si se menciona)
-
-    Si la sección no tiene información relevante, responde: "Sin hallazgos críticos en esta sección."
-    Si no es texto legal, responde "ERROR_CONTEXTO".`;
-
+/**
+ * Llamada genérica a la API
+ */
+async function callAnalyzeAPI(textToSend, promptInstruction) {
     const response = await fetch("/.netlify/functions/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            systemPrompt: systemPrompt,
-            userText: textChunk
+            systemPrompt: promptInstruction,
+            userText: textToSend
         })
     });
 
-    if (!response.ok) throw new Error(`Timeout o Error ${response.status}`);
-
+    if (!response.ok) throw new Error(`Error API: ${response.status}`);
     const data = await response.json();
     if (data.content.includes('ERROR_CONTEXTO')) throw new Error("Texto inválido");
     
@@ -244,20 +287,13 @@ function processFinalResult(markdown, totalChars) {
 
     elements.reportContent.innerHTML = parseMarkdown(markdown);
 
-    // Regex ajustado para capturar mejor las secciones
-    const allRisks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/g);
+    // Regex para extraer banderas rojas del reporte final
+    const risksMatch = markdown.match(/## Banderas Rojas[\s\S]*?(?=## Retención|## |$)/);
     
-    if (allRisks && allRisks.length > 0) {
-        // Filtramos secciones vacías o repetitivas
-        const validRisks = allRisks.filter(r => r.length > 25 && !r.includes("Sin hallazgos"));
-        
-        if (validRisks.length > 0) {
-            elements.riskContent.innerHTML = validRisks.map(r => parseMarkdown(r)).join('<hr class="risk-separator">');
-        } else {
-            elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se encontraron riesgos críticos específicos.</p>';
-        }
+    if (risksMatch) {
+        elements.riskContent.innerHTML = parseMarkdown(risksMatch[0]);
     } else {
-        elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se detectaron banderas rojas críticas.</p>';
+        elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se encontraron riesgos críticos específicos en el reporte final.</p>';
     }
 
     updateStatistics(totalChars);
@@ -265,6 +301,7 @@ function processFinalResult(markdown, totalChars) {
     switchTab(0);
 }
 
+// Utilidades UI (Sin cambios)
 function toggleLoading(show, text = "Cargando...") {
     if (show) {
         elements.loadingState.classList.add('active');
