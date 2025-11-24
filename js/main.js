@@ -146,7 +146,7 @@ async function performAnalysis(chunks) {
 }
 
 /**
- * Llama a la API (Backend)
+ * Llama a la API (Backend) - Versión con reporte de errores real
  */
 async function callAnalyzeAPI(textChunk, contextNote) {
     const systemPrompt = `Actúa como CISO experto.
@@ -154,13 +154,13 @@ async function callAnalyzeAPI(textChunk, contextNote) {
     
     Genera un reporte MARKDOWN conciso.
     Estructura:
-    ## Resumen Ejecutivo (Breve)
-    ## Datos Recolectados (Lista)
+    ## Resumen Ejecutivo
+    ## Datos Recolectados
     ## Compartición con Terceros
     ## Banderas Rojas (Riesgos Críticos)
     ## Retención y Derechos
     
-    Sé directo. Evita introducciones largas.`;
+    Sé directo.`;
 
     const response = await fetch("/.netlify/functions/analyze", {
         method: "POST",
@@ -171,13 +171,18 @@ async function callAnalyzeAPI(textChunk, contextNote) {
         })
     });
 
+    // Intentamos leer el mensaje de error real del servidor
     if (!response.ok) {
-        // Si una parte falla por timeout, devolvemos un mensaje de error parcial
-        // para no romper todo el reporte.
-        if (response.status === 500 || response.status === 502) {
-             return "⚠️ **Error en esta sección:** El análisis tardó demasiado. Revisa manualmente esta parte del texto.";
+        let errorMessage = "Error desconocido";
+        try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.details || "Error del servidor";
+        } catch (e) {
+            errorMessage = `Error HTTP ${response.status}`;
         }
-        throw new Error(`Error API: ${response.status}`);
+        
+        // Devolvemos el error visible en el reporte para depurar
+        return `⚠️ **ERROR DEL SISTEMA:** \n\nNo se pudo analizar esta sección.\n**Razón:** ${errorMessage}`;
     }
 
     const data = await response.json();
