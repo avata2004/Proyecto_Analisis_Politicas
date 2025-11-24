@@ -26,10 +26,20 @@
     <header class="header">
         <div class="header-content">
             <h1 class="logo-text">Privacy Guard</h1>
+            <p class="tagline">Potenciado por Gemini 2.5 Flash</p>
         </div>
     </header>
 
     <main class="main-container">
+        
+        <section class="intro-section" style="text-align: center; margin-bottom: 2rem;">
+            <h2 class="section-title">Entiende lo que aceptas antes de firmar</h2>
+            <p class="section-description">
+                Sube un contrato PDF, pega el texto o ingresa un enlace web. 
+                Nuestra IA analizará las letras pequeñas para detectar <strong>riesgos, cláusulas abusivas y uso de tus datos</strong>.
+            </p>
+        </section>
+
         <section class="input-section">
             <div class="mode-selector" style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
                 <button id="modeText" class="mode-btn active-mode" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄 Texto / PDF</button>
@@ -43,13 +53,14 @@
                         <input type="file" id="pdfUpload" accept=".pdf" hidden>
                         <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">📂 Subir PDF</button>
                     </div>
-                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí..." rows="10"></textarea>
+                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto de los términos y condiciones aquí..." rows="10"></textarea>
                     <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span></div>
                 </div>
 
                 <div id="urlInputContainer" style="display: none;">
                     <label class="input-label">Dirección del sitio web</label>
-                    <input type="url" id="urlInput" class="text-input" placeholder="https://ejemplo.com">
+                    <input type="url" id="urlInput" class="text-input" placeholder="https://ejemplo.com/privacidad">
+                    <p class="input-hint" style="margin-top: 0.5rem; font-size: 0.85rem; color: #64748b;">Analizaremos el contenido público de la página.</p>
                 </div>
             </div>
 
