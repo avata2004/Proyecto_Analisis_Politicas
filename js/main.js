@@ -1,15 +1,11 @@
 /**
  * Privacy Guard - Main Application Logic
- * Versión: Chunking + Consolidación Final (Map-Reduce)
+ * Versión simplificada para uso con Google Gemini 1.5 Flash
  */
 
 // Variables globales
 let currentMarkdown = '';
 let currentCharCount = 0;
-
-// Configuración
-const CHUNK_SIZE = 3500; // Seguro para timeouts
-const MAX_RETRIES = 2; 
 
 // Elementos del DOM
 const elements = {
@@ -23,6 +19,7 @@ const elements = {
     riskContent: document.getElementById('riskContent'),
     statChars: document.getElementById('statChars'),
     statDate: document.getElementById('statDate'),
+    statModel: document.getElementById('statModel'), // Si decidiste dejarlo en el HTML
     pdfUpload: document.getElementById('pdfUpload')
 };
 
@@ -39,7 +36,7 @@ function setupEventListeners() {
 }
 
 // ==========================================
-// LÓGICA DE PDF
+// LÓGICA DE PDF (Sin cambios)
 // ==========================================
 async function handlePdfUpload(event) {
     const file = event.target.files[0];
@@ -68,7 +65,7 @@ async function handlePdfUpload(event) {
 
     } catch (error) {
         console.error('Error al leer PDF:', error);
-        alert('❌ Error al leer el archivo PDF.');
+        alert('❌ Error al leer el archivo PDF. Asegúrate de que no esté protegido.');
         toggleLoading(false);
     }
     event.target.value = '';
@@ -81,63 +78,82 @@ function handleTextInput() {
 }
 
 // ==========================================
-// LÓGICA DE ANÁLISIS "MAP-REDUCE"
+// LÓGICA DE ANÁLISIS (SIMPLIFICADA PARA GEMINI)
 // ==========================================
-
-function splitTextSafe(text, maxLength) {
-    const chunks = [];
-    let currentChunk = '';
-    const paragraphs = text.split('\n');
-
-    for (let paragraph of paragraphs) {
-        if (paragraph.length > maxLength) {
-            const words = paragraph.split(' ');
-            for (let word of words) {
-                if ((currentChunk + word).length > maxLength) {
-                    chunks.push(currentChunk);
-                    currentChunk = '';
-                }
-                currentChunk += word + ' ';
-            }
-        } else {
-            if ((currentChunk + paragraph).length > maxLength) {
-                chunks.push(currentChunk);
-                currentChunk = '';
-            }
-            currentChunk += paragraph + '\n';
-        }
-    }
-    if (currentChunk.trim()) chunks.push(currentChunk);
-    return chunks;
-}
 
 async function analyzePrivacy() {
     const text = elements.textarea.value.trim();
-    if (text.length < 50) return;
 
-    if (text.length > CHUNK_SIZE) {
-        await analyzeLargeDocument(text);
-    } else {
-        await analyzeSingleBlock(text);
+    // Validación básica
+    if (text.length < 50) {
+        alert('⚠️ El texto es muy corto para un análisis significativo (mínimo 50 caracteres).');
+        return;
     }
-}
 
-async function analyzeSingleBlock(text) {
-    toggleLoading(true, "Analizando documento...");
+    // Mensaje de carga
+    toggleLoading(true, "Analizando documento completo con IA...");
+
+    // Prompt del sistema (Instrucciones para Gemini)
+    const systemPrompt = `Actúa como un experto senior en Ciberseguridad y Privacidad de Datos (CISO).
+Tu tarea es analizar los siguientes "Términos y Condiciones" o "Política de Privacidad".
+
+Debes generar un reporte estructurado estrictamente en formato MARKDOWN.
+El tono debe ser profesional, objetivo y claro para un usuario promedio.
+
+Estructura OBLIGATORIA de la respuesta:
+
+## Resumen Ejecutivo
+(Un párrafo conciso de máx 100 palabras sobre el nivel general de intrusión).
+
+## Datos Personales Recolectados
+(Lista con viñetas exhaustiva de qué datos se llevan: e.g., • Datos de contacto, • Ubicación precisa, • Datos biométricos).
+
+## Compartición con Terceros
+(¿A quién le dan los datos? Socios, anunciantes, autoridades).
+
+## Banderas Rojas (Riesgos Altos)
+(Analiza críticamente: cláusulas abusivas, renuncias de derechos, retención indefinida, venta de datos. Si no hay riesgos graves, indícalo).
+
+## Retención y Derechos
+(Cuánto tiempo guardan los datos y el proceso para borrarlos).
+
+## Recomendaciones de Seguridad
+(3 consejos prácticos accionables para el usuario).
+
+Si el texto proporcionado NO parece ser un documento legal, responde ÚNICAMENTE: "ERROR_CONTEXTO".`;
+
     try {
-        // Prompt estándar para documentos cortos
-        const prompt = `Actúa como CISO. Analiza este documento legal.
-        Genera un reporte MARKDOWN:
-        ## Resumen Ejecutivo
-        ## Datos Personales Recolectados
-        ## Compartición con Terceros
-        ## Banderas Rojas
-        ## Retención y Derechos
-        ## Recomendaciones
-        `;
-        
-        const result = await callAnalyzeAPI(text, prompt);
-        processFinalResult(result, text.length);
+        // Llamada única a la API
+        const response = await fetch("/.netlify/functions/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemPrompt: systemPrompt,
+                userText: text
+            })
+        });
+
+        if (!response.ok) {
+            // Intentar leer el mensaje de error del backend si existe
+            let errorMsg = `Error ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.error || errorMsg;
+            } catch(e) {}
+            throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+        const aiResponse = data.content;
+
+        // Validar respuesta de contexto
+        if (aiResponse && aiResponse.includes('ERROR_CONTEXTO')) {
+            alert('❌ El texto analizado no parece ser un documento legal válido.');
+            return;
+        }
+
+        processFinalResult(aiResponse, text.length);
+
     } catch (error) {
         handleError(error);
     } finally {
@@ -145,155 +161,24 @@ async function analyzeSingleBlock(text) {
     }
 }
 
-/**
- * Estrategia Map-Reduce: 
- * 1. Analiza cada trozo para extraer datos (Map)
- * 2. Envía todos los datos extraídos para crear un resumen final (Reduce)
- */
-async function analyzeLargeDocument(text) {
-    const chunks = splitTextSafe(text, CHUNK_SIZE);
-    let intermediateResults = []; // Aquí guardamos las notas de cada sección
-
-    toggleLoading(true, `Iniciando análisis de ${chunks.length} secciones...`);
-
-    try {
-        // FASE 1: EXTRACCIÓN (MAP)
-        for (let i = 0; i < chunks.length; i++) {
-            let success = false;
-            let attempt = 1;
-            
-            // Prompt enfocado en EXTRACCIÓN DE DATOS (no en formato final)
-            const chunkPrompt = `Analiza esta SECCIÓN (${i+1}/${chunks.length}) de un contrato.
-            Extrae SOLAMENTE en lista de bullets:
-            - Datos personales específicos mencionados.
-            - Terceros con quienes se comparten datos.
-            - Cláusulas abusivas o riesgos (Banderas Rojas).
-            - Periodos de retención.
-            Sé muy conciso. No escribas introducciones.`;
-
-            // Pausa entre peticiones
-            if (i > 0) await new Promise(r => setTimeout(r, 1500));
-
-            while (!success && attempt <= MAX_RETRIES) {
-                try {
-                    if(elements.loadingText) {
-                        elements.loadingText.textContent = `Analizando parte ${i + 1} de ${chunks.length}...`;
-                    }
-
-                    const result = await callAnalyzeAPI(chunks[i], chunkPrompt);
-                    intermediateResults.push(`--- NOTAS SECCIÓN ${i+1} ---\n${result}`);
-                    success = true;
-                } catch (err) {
-                    console.warn(`Fallo parte ${i+1}`, err);
-                    attempt++;
-                    if (attempt <= MAX_RETRIES) await new Promise(r => setTimeout(r, 2000));
-                }
-            }
-        }
-
-        // FASE 2: CONSOLIDACIÓN (REDUCE)
-        if (intermediateResults.length > 0) {
-            await generateFinalMasterReport(intermediateResults, text.length);
-        } else {
-            throw new Error("No se pudo extraer información de ninguna sección.");
-        }
-
-    } catch (error) {
-        handleError(error);
-        toggleLoading(false);
-    }
-}
 
 /**
- * Genera el reporte final consolidado
+ * Procesa y muestra los resultados finales
  */
-async function generateFinalMasterReport(notesArray, totalChars) {
-    if(elements.loadingText) elements.loadingText.textContent = "Unificando resultados y generando reporte final...";
-    
-    // Unimos todas las notas en un solo texto
-    const allNotes = notesArray.join("\n\n");
-
-    // Prompt de consolidación
-    const masterPrompt = `Actúa como CISO experto. A continuación te doy las NOTAS EXTRAÍDAS de varias secciones de un documento legal largo.
-    
-    Tu tarea es UNIFICAR y RESUMIR estas notas en un único reporte coherente.
-    IMPORTANTE:
-    - Elimina duplicados (ej: si "email" aparece en 5 secciones, ponlo una sola vez).
-    - Si hay banderas rojas repetidas, únelas.
-    - Mantén el formato MARKDOWN estricto.
-
-    Estructura requerida:
-    ## Resumen Ejecutivo
-    (Visión global del riesgo)
-    
-    ## Datos Personales Recolectados
-    (Lista unificada y limpia)
-
-    ## Compartición con Terceros
-    (Lista unificada de quién recibe los datos)
-
-    ## Banderas Rojas (Riesgos Altos)
-    (Las cláusulas más peligrosas encontradas en todo el documento)
-
-    ## Retención y Derechos
-    (Resumen de tiempos y cómo borrar datos)
-
-    ## Recomendaciones de Seguridad
-    (3 consejos finales)
-
-    AQUÍ ESTÁN LAS NOTAS A PROCESAR:
-    `;
-
-    try {
-        // Enviamos las notas a la IA para que escriba el reporte final
-        // Nota: Usamos las notas como "userText"
-        const finalReport = await callAnalyzeAPI(allNotes, masterPrompt);
-        
-        processFinalResult(finalReport, totalChars);
-    } catch (error) {
-        // Si falla la consolidación (timeout), mostramos las notas crudas como fallback
-        console.error("Error en consolidación final:", error);
-        alert("⚠️ El documento es muy complejo. Se mostrarán las notas de cada sección sin resumir.");
-        const rawReport = "# ⚠️ Reporte No Consolidado\n" + allNotes;
-        processFinalResult(rawReport, totalChars);
-    } finally {
-        toggleLoading(false);
-    }
-}
-
-/**
- * Llamada genérica a la API
- */
-async function callAnalyzeAPI(textToSend, promptInstruction) {
-    const response = await fetch("/.netlify/functions/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            systemPrompt: promptInstruction,
-            userText: textToSend
-        })
-    });
-
-    if (!response.ok) throw new Error(`Error API: ${response.status}`);
-    const data = await response.json();
-    if (data.content.includes('ERROR_CONTEXTO')) throw new Error("Texto inválido");
-    
-    return data.content;
-}
-
 function processFinalResult(markdown, totalChars) {
     currentMarkdown = markdown;
     currentCharCount = totalChars;
 
+    // Renderizar Markdown completo
     elements.reportContent.innerHTML = parseMarkdown(markdown);
 
-    // Regex para extraer banderas rojas del reporte final
+    // Extraer sección de riesgos para su pestaña
     const risksMatch = markdown.match(/## Banderas Rojas[\s\S]*?(?=## Retención|## |$)/);
     
-    if (risksMatch) {
+    if (risksMatch && risksMatch[0].length > 30) {
         elements.riskContent.innerHTML = parseMarkdown(risksMatch[0]);
     } else {
-        elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se encontraron riesgos críticos específicos en el reporte final.</p>';
+        elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se detectaron banderas rojas críticas en el análisis.</p>';
     }
 
     updateStatistics(totalChars);
@@ -301,7 +186,11 @@ function processFinalResult(markdown, totalChars) {
     switchTab(0);
 }
 
-// Utilidades UI (Sin cambios)
+
+// ==========================================
+// UTILIDADES DE UI
+// ==========================================
+
 function toggleLoading(show, text = "Cargando...") {
     if (show) {
         elements.loadingState.classList.add('active');
@@ -334,6 +223,10 @@ function switchTab(index) {
 
 function updateStatistics(charCount) {
     if(elements.statChars) elements.statChars.textContent = charCount.toLocaleString();
+    
+    // Si decidiste mantener el elemento en el HTML, lo actualizamos
+    if(elements.statModel) elements.statModel.textContent = "Gemini 1.5 Flash";
+
     if(elements.statDate) {
         elements.statDate.textContent = new Date().toLocaleDateString('es-MX', {
             year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -342,8 +235,8 @@ function updateStatistics(charCount) {
 }
 
 function handleError(error) {
-    console.error('Error:', error);
-    alert(`❌ Ha ocurrido un error: ${error.message}`);
+    console.error('Error completo:', error);
+    alert(`❌ Ha ocurrido un error: ${error.message}\n\nSi el documento es extremadamente largo, podría ser un límite de tiempo del servidor gratuito.`);
     toggleLoading(false);
 }
 
