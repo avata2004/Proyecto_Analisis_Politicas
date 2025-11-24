@@ -1,9 +1,8 @@
 /**
  * Privacy Guard - Versión Client-Side (Sin Backend)
- * Elimina problemas de Timeout de Netlify y errores de conexión.
+ * Modelo: Gemini 2.5 Flash
  */
 
-// Importamos la librería directamente desde la web (gracias al importmap en index.html)
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ==========================================
@@ -11,10 +10,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // ==========================================
 const API_KEY = "AIzaSyDGXGGf__tN9B7OZxa99kQJSOeFznwwbNY"; 
 
-// Configuración de límites (Ahora podemos subir más porque no hay timeout de 10s)
+// Configuración de límites (30k es seguro para el navegador)
 const CHUNK_SIZE = 30000; 
 
-// Elementos del DOM
 const elements = {
     textarea: document.getElementById('privacyText'),
     urlInput: document.getElementById('urlInput'),
@@ -34,9 +32,8 @@ const elements = {
 
 let currentInputType = 'text';
 
-// Inicialización
 function init() {
-    if (!elements.analyzeBtn) return; // Esperar al DOM
+    if (!elements.analyzeBtn) return; 
     setupEventListeners();
     hideResults();
 }
@@ -45,11 +42,10 @@ function setupEventListeners() {
     elements.inputModeText.addEventListener('click', () => switchInputMode('text'));
     elements.inputModeUrl.addEventListener('click', () => switchInputMode('url'));
     elements.textarea.addEventListener('input', handleTextInput);
-    elements.analyzeBtn.addEventListener('click', analyzePrivacy); // Ojo: sin onclick en HTML
+    elements.analyzeBtn.addEventListener('click', analyzePrivacy);
     
     if(elements.pdfUpload) elements.pdfUpload.addEventListener('change', handlePdfUpload);
     
-    // Funciones globales para que el HTML las vea (tab switch, etc)
     window.switchTab = switchTab;
 }
 
@@ -70,7 +66,7 @@ function switchInputMode(mode) {
     }
 }
 
-// --- UTILIDAD: Proxy CORS para URLs ---
+// --- UTILIDAD: Proxy CORS ---
 async function fetchUrlContent(url) {
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
@@ -88,13 +84,14 @@ async function fetchUrlContent(url) {
 
 // --- LÓGICA DE IA DIRECTA (CLIENT SIDE) ---
 async function callGeminiDirect(text, promptContext) {
-    if (!API_KEY || API_KEY.includes("AQUI_PEGA")) {
+    if (!API_KEY || API_KEY.includes("PEGA_AQUI")) {
         throw new Error("Falta la API Key en main.js");
     }
 
     const genAI = new GoogleGenerativeAI(API_KEY);
-    // Usamos Flash porque es rápido y barato
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    // === CORRECCIÓN AQUÍ: USAMOS GEMINI 2.5 FLASH ===
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const systemPrompt = `Actúa como Experto CISO. ${promptContext}
     Analiza el siguiente texto legal.
@@ -133,13 +130,11 @@ async function analyzePrivacy() {
 
         if (textToAnalyze.length < 50) return;
 
-        // ESTRATEGIA: Si es corto, 1 llamada. Si es largo, secuencial.
         if (textToAnalyze.length <= CHUNK_SIZE) {
             toggleLoading(true, "Analizando con IA...");
             const markdown = await callGeminiDirect(textToAnalyze, "Analisis Completo");
             processFinalResult(markdown);
         } else {
-            // Secuencial
             const chunks = splitTextSafe(textToAnalyze, CHUNK_SIZE);
             const partials = [];
             
@@ -148,7 +143,6 @@ async function analyzePrivacy() {
                 const context = `(Parte ${i+1} de ${chunks.length}). Extrae puntos clave.`;
                 const res = await callGeminiDirect(chunks[i], context);
                 partials.push(res);
-                // Pequeña pausa para no saturar la API
                 await new Promise(r => setTimeout(r, 1000));
             }
 
@@ -165,7 +159,6 @@ async function analyzePrivacy() {
     }
 }
 
-// Utilidades PDF y Texto
 async function handlePdfUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -217,7 +210,7 @@ function processFinalResult(markdown) {
         const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
         elements.riskContent.innerHTML = risks ? window.parseMarkdown(risks[0]) : "✅ Sin riesgos críticos.";
     } else {
-        elements.reportContent.innerText = markdown; // Fallback
+        elements.reportContent.innerText = markdown;
     }
     
     elements.resultsSection.classList.add('active');
@@ -246,6 +239,5 @@ function switchTab(index) {
     });
 }
 
-// Iniciar
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
