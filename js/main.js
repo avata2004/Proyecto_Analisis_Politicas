@@ -1,14 +1,9 @@
 /**
- * Privacy Guard - Final Version
- * Client-Side | Gemini 2.5 Flash | Jina AI Reader
+ * Privacy Guard - Secure Client-Side
+ * Modelo: Gemini 2.5 Flash
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// ==========================================
-// ⚠️ CONFIGURACIÓN: PEGA TU API KEY AQUÍ
-// ==========================================
-const API_KEY = "AIzaSyDGXGGf__tN9B7OZxa99kQJSOeFznwwbNY"; 
 
 const CHUNK_SIZE = 30000; 
 
@@ -21,8 +16,6 @@ const elements = {
     urlInputContainer: document.getElementById('urlInputContainer'),
     charCount: document.getElementById('charCount'),
     analyzeBtn: document.getElementById('analyzeBtn'),
-    
-    // UI Elements
     loadingState: document.getElementById('loadingState'),
     loadingText: document.getElementById('loadingText'),
     progressBar: document.getElementById('progressBar'),
@@ -34,6 +27,8 @@ const elements = {
 };
 
 let currentInputType = 'text';
+// Variable para guardar la key temporalmente
+let CACHED_API_KEY = null;
 
 function init() {
     if (!elements.analyzeBtn) return; 
@@ -68,53 +63,49 @@ function switchInputMode(mode) {
     }
 }
 
-// --- NUEVA LÓGICA DE URL (USANDO JINA AI) ---
-// Esta es la solución experta para evitar bloqueos de descarga
-async function fetchUrlContent(url) {
-    // Jina AI Reader convierte cualquier URL en Markdown limpio para LLMs
-    const readerUrl = `https://r.jina.ai/${url}`;
-    
+// --- OBTENER API KEY SEGURA ---
+async function getApiKey() {
+    if (CACHED_API_KEY) return CACHED_API_KEY;
+
     try {
-        const response = await fetch(readerUrl, {
-            headers: {
-                'x-no-cache': 'true' // Forzar lectura fresca
-            }
-        });
+        const response = await fetch('/.netlify/functions/get-apikey');
+        if (!response.ok) throw new Error("No se pudo obtener la configuración de seguridad.");
+        const data = await response.json();
+        if (!data.key) throw new Error("Clave de API no encontrada en el servidor.");
         
+        CACHED_API_KEY = data.key;
+        return CACHED_API_KEY;
+    } catch (error) {
+        console.error("Auth Error:", error);
+        throw new Error("Error de autenticación. Verifica las variables de entorno en Netlify.");
+    }
+}
+
+async function fetchUrlContent(url) {
+    const readerUrl = `https://r.jina.ai/${url}`;
+    try {
+        const response = await fetch(readerUrl, { headers: { 'x-no-cache': 'true' } });
         if (!response.ok) throw new Error("El servicio de lectura no pudo acceder al sitio.");
-        
         let text = await response.text();
-        
-        // Validación: A veces devuelven errores dentro del texto
         if (!text || text.length < 100 || text.includes("Jina AI - Access Denied")) {
             throw new Error("El sitio web tiene protección anti-bot muy estricta.");
         }
-
-        // Limpieza extra (Jina ya limpia mucho, pero aseguramos)
-        // Quitamos enlaces a imágenes o menús que Jina a veces deja
-        return text.slice(0, 100000); // Límite de seguridad de 100k caracteres
-
+        return text.slice(0, 100000); 
     } catch (error) {
-        console.error("Url Error:", error);
-        throw new Error("No se pudo descargar la web automáticamente. Algunos sitios (como Facebook o Bancos) bloquean esto por seguridad. Por favor, copia y pega el texto manualmente.");
+        throw new Error("No se pudo descargar la web automáticamente.");
     }
 }
 
 // --- IA DIRECTA ---
 async function callGeminiDirect(text, promptContext) {
-    if (!API_KEY || API_KEY.includes("PEGA_AQUI")) throw new Error("Falta la API Key en main.js");
+    // 1. Obtenemos la clave de forma segura antes de llamar a Google
+    const apiKey = await getApiKey();
 
-    const genAI = new GoogleGenerativeAI(API_KEY);
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // PROMPT ESTRICTO (Sin saludos)
     const systemPrompt = `Actúa como CISO. ${promptContext}
-    
-    INSTRUCCIONES DE SALIDA:
-    1. Genera SOLO el reporte en formato MARKDOWN.
-    2. NO incluyas introducciones ni saludos (ej: "Como experto...", "Aquí tienes").
-    3. Empieza directamente con el título o encabezado.
-
+    INSTRUCCIONES: Genera SOLO el reporte en MARKDOWN. Sin saludos. Empieza directo.
     Estructura:
     ## Resumen Ejecutivo
     ## Datos Recolectados
@@ -139,31 +130,22 @@ async function analyzePrivacy() {
         if (currentInputType === 'url') {
             const url = elements.urlInput.value.trim();
             if (!url.startsWith('http')) { alert('URL inválida'); return; }
-            
             toggleLoading(true, 0, "Conectando con lector inteligente...");
-            // Pequeña barra falsa para UX
             setTimeout(() => updateProgress(30, "Descargando y limpiando contenido..."), 800);
-            
             textToAnalyze = await fetchUrlContent(url);
-            
             if (textToAnalyze.length < 200) throw new Error("Sitio web vacío.");
-            
         } else {
             textToAnalyze = elements.textarea.value.trim();
         }
 
         if (textToAnalyze.length < 50) return;
 
-        // ESTRATEGIA DE ANÁLISIS
         if (textToAnalyze.length <= CHUNK_SIZE) {
             toggleLoading(true, 50, "Analizando con IA...");
             const markdown = await callGeminiDirect(textToAnalyze, "Analisis Completo");
-            
             updateProgress(100, "Finalizando...");
             setTimeout(() => processFinalResult(markdown), 800);
-            
         } else {
-            // Secuencial para textos largos
             const chunks = splitTextSafe(textToAnalyze, CHUNK_SIZE);
             const partials = [];
             toggleLoading(true, 0, "Iniciando análisis secuencial...");
@@ -180,7 +162,6 @@ async function analyzePrivacy() {
             updateProgress(90, "Unificando reporte final...");
             const combined = partials.join("\n\n");
             const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes. NO incluyas saludos.");
-            
             updateProgress(100, "¡Listo!");
             setTimeout(() => processFinalResult(finalReport), 800);
         }
@@ -241,8 +222,7 @@ function splitTextSafe(text, maxLength) {
 }
 
 function processFinalResult(markdown) {
-    window.currentMarkdown = markdown; // Para el PDF generator
-
+    window.currentMarkdown = markdown;
     if(window.parseMarkdown) {
         elements.reportContent.innerHTML = window.parseMarkdown(markdown);
         const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
@@ -250,7 +230,6 @@ function processFinalResult(markdown) {
     } else {
         elements.reportContent.innerText = markdown;
     }
-    
     elements.resultsSection.classList.add('active');
     elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
     toggleLoading(false);
