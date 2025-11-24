@@ -10,7 +10,7 @@ let currentCharCount = 0;
 // Configuración de límites
 // Netlify Free corta a los 10s. Gemini Flash procesa ~40k chars en 7-8s.
 // Si el texto pasa de 45k, lo dividimos para procesarlo en paralelo.
-const SAFE_CHUNK_SIZE = 45000; 
+const SAFE_CHUNK_SIZE = 45000;
 
 const elements = {
     textarea: document.getElementById('privacyText'),
@@ -34,7 +34,7 @@ function init() {
 
 function setupEventListeners() {
     elements.textarea.addEventListener('input', handleTextInput);
-    if(elements.pdfUpload) {
+    if (elements.pdfUpload) {
         elements.pdfUpload.addEventListener('change', handlePdfUpload);
     }
 }
@@ -96,7 +96,7 @@ async function analyzePrivacy() {
     if (text.length <= SAFE_CHUNK_SIZE) {
         // Estrategia Simple (1 Petición)
         toggleLoading(true, "Analizando documento con IA...");
-        await performAnalysis([text]); 
+        await performAnalysis([text]);
     } else {
         // Estrategia Paralela (>45k chars)
         // Dividimos y enviamos todo a la vez para "burlar" el límite de tiempo total
@@ -125,13 +125,13 @@ async function performAnalysis(chunks) {
 
         // Unimos los resultados
         let finalMarkdown = "";
-        
+
         if (results.length === 1) {
             finalMarkdown = results[0];
         } else {
             // Si hay varios, los unimos con separadores claros
             finalMarkdown = "# 📑 REPORTE DE ANÁLISIS COMPLETO\n\n";
-            finalMarkdown += results.map((res, i) => 
+            finalMarkdown += results.map((res, i) =>
                 `## 🔹 Análisis de la Sección ${i + 1}\n${res}`
             ).join("\n\n---\n\n");
         }
@@ -180,9 +180,10 @@ async function callAnalyzeAPI(textChunk, contextNote) {
         } catch (e) {
             errorMessage = `Error HTTP ${response.status}`;
         }
-        
+
         // Devolvemos el error visible en el reporte para depurar
-        return `⚠️ **ERROR DEL SISTEMA:** \n\nNo se pudo analizar esta sección.\n**Razón:** ${errorMessage}`;
+        const detailMsg = errorData.details || errorData.error || errorMessage;
+        return `⚠️ **ERROR TÉCNICO:** \n\nNo se pudo analizar esta sección.\n**Detalle:** ${detailMsg}`;
     }
 
     const data = await response.json();
@@ -203,11 +204,11 @@ function splitTextSafe(text, maxLength) {
             currentChunk = '';
         }
         currentChunk += paragraph + '\n';
-        
+
         // Si un solo párrafo es gigante (raro, pero posible)
         if (currentChunk.length > maxLength) {
-             chunks.push(currentChunk);
-             currentChunk = '';
+            chunks.push(currentChunk);
+            currentChunk = '';
         }
     }
     if (currentChunk.trim()) chunks.push(currentChunk);
@@ -226,7 +227,7 @@ function processFinalResult(markdown, totalChars) {
 
     // Extraemos banderas rojas de TODO el documento combinado
     const allRisks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |---|$))/g);
-    
+
     if (allRisks && allRisks.length > 0) {
         const riskHtml = allRisks.map(r => parseMarkdown(r)).join('<hr class="risk-separator">');
         elements.riskContent.innerHTML = riskHtml;
@@ -242,7 +243,7 @@ function processFinalResult(markdown, totalChars) {
 function toggleLoading(show, text = "Cargando...") {
     if (show) {
         elements.loadingState.classList.add('active');
-        if(elements.loadingText) elements.loadingText.textContent = text;
+        if (elements.loadingText) elements.loadingText.textContent = text;
         elements.resultsSection.classList.remove('active');
         elements.analyzeBtn.disabled = true;
     } else {
@@ -270,9 +271,9 @@ function switchTab(index) {
 }
 
 function updateStatistics(charCount) {
-    if(elements.statChars) elements.statChars.textContent = charCount.toLocaleString();
-    if(elements.statModel) elements.statModel.textContent = "Gemini 1.5 Flash";
-    if(elements.statDate) {
+    if (elements.statChars) elements.statChars.textContent = charCount.toLocaleString();
+    if (elements.statModel) elements.statModel.textContent = "Gemini 1.5 Flash";
+    if (elements.statDate) {
         elements.statDate.textContent = new Date().toLocaleDateString('es-MX', {
             year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
         });
