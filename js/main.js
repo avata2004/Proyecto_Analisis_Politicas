@@ -146,7 +146,7 @@ async function performAnalysis(chunks) {
 }
 
 /**
- * Llama a la API (Backend) - Versión con reporte de errores real
+ * Llama a la API (Backend) - Versión CORREGIDA y ROBUSTA
  */
 async function callAnalyzeAPI(textChunk, contextNote) {
     const systemPrompt = `Actúa como CISO experto.
@@ -171,19 +171,25 @@ async function callAnalyzeAPI(textChunk, contextNote) {
         })
     });
 
-    // Intentamos leer el mensaje de error real del servidor
     if (!response.ok) {
-        let errorMessage = "Error desconocido";
+        let finalErrorMessage = `Error HTTP ${response.status}`;
+        
         try {
+            // Intentamos leer la respuesta como JSON
             const errorData = await response.json();
-            errorMessage = errorData.error || errorData.details || "Error del servidor";
+            // Priorizamos 'details' o 'error' si existen
+            finalErrorMessage = errorData.details || errorData.error || JSON.stringify(errorData);
         } catch (e) {
-            errorMessage = `Error HTTP ${response.status}`;
+            // Si falla al leer JSON, intentamos leer como texto plano
+            try {
+                finalErrorMessage = await response.text();
+            } catch (e2) {
+                // Si todo falla, nos quedamos con el status code
+                finalErrorMessage = `Error de conexión (${response.status})`;
+            }
         }
-
-        // Devolvemos el error visible en el reporte para depurar
-        const detailMsg = errorData.details || errorData.error || errorMessage;
-        return `⚠️ **ERROR TÉCNICO:** \n\nNo se pudo analizar esta sección.\n**Detalle:** ${detailMsg}`;
+        
+        return `⚠️ **ERROR TÉCNICO DETECTADO:** \n\nNo se pudo analizar esta sección.\n**Detalle del Servidor:** ${finalErrorMessage}`;
     }
 
     const data = await response.json();
