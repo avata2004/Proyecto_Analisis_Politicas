@@ -8,7 +8,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // ==========================================
 // ⚠️ CONFIGURACIÓN: PEGA TU API KEY AQUÍ
 // ==========================================
-const API_KEY = "AIzaSyDGXGGf__tN9B7OZxa99kQJSOeFznwwbNY..."; 
+const API_KEY = "AIzaSyDGXGGf__tN9B7OZxa99kQJSOeFznwwbNY"; 
 
 const CHUNK_SIZE = 30000; 
 
