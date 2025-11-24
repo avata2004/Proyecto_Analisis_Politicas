@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 exports.handler = async (event) => {
+  // Solo permitir POST
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
@@ -14,38 +15,56 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body);
     let { systemPrompt, userText, inputType, linkUrl } = body;
 
-    // --- LÓGICA NUEVA PARA LINKS ---
+    // --- LÓGICA DE SCRAPING MEJORADA (SOLUCIÓN ERROR URL) ---
     if (inputType === 'url' && linkUrl) {
         try {
-            console.log("Descargando URL:", linkUrl);
-            const response = await fetch(linkUrl);
-            if (!response.ok) throw new Error("No se pudo acceder a la URL");
+            console.log("Intentando descargar URL:", linkUrl);
+            
+            // Simular un navegador real para evitar bloqueos
+            const headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache"
+            };
+
+            const response = await fetch(linkUrl, { headers });
+            
+            if (!response.ok) {
+                throw new Error(`El sitio web rechazó la conexión (Status: ${response.status})`);
+            }
+            
             const html = await response.text();
             
-            // Limpieza básica de HTML para obtener solo texto (sin librerías pesadas)
+            // Limpieza PROFUNDA de HTML (Quita ruido para que la IA entienda mejor)
             userText = html
-                .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, "") // Quitar scripts
-                .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, "")   // Quitar estilos
+                .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, " ") // Quitar JS
+                .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, " ")   // Quitar CSS
+                .replace(/<nav\b[^>]*>([\s\S]*?)<\/nav>/gim, " ")       // Quitar menús nav
+                .replace(/<footer\b[^>]*>([\s\S]*?)<\/footer>/gim, " ") // Quitar footer
                 .replace(/<[^>]+>/g, "\n")                              // Quitar tags HTML
-                .replace(/\s+/g, " ")                                   // Normalizar espacios
+                .replace(/&nbsp;/g, " ")
+                .replace(/\s+/g, " ")                                   // Colapsar espacios
                 .trim();
                 
-            if (userText.length < 100) throw new Error("No se encontró texto suficiente en la web.");
+            if (userText.length < 200) throw new Error("La página parece vacía o protegida contra lectura.");
             
         } catch (err) {
+            console.error("Error Fetching URL:", err);
             return {
                 statusCode: 400,
-                body: JSON.stringify({ error: `Error leyendo la URL: ${err.message}` })
+                body: JSON.stringify({ error: `No pudimos leer el sitio web. ${err.message}` })
             };
         }
     }
 
     // Inicializar Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Usamos 'gemini-1.5-flash' (o 'gemini-2.5-flash' si tu cuenta lo tiene)
-    // Flash es CRÍTICO para velocidad.
+    
+    // Usamos el modelo Flash. Si tienes acceso a gemini-2.5-flash úsalo, si no gemini-1.5-flash
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+    // Prompt final
     const finalPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${userText}`;
 
     const result = await model.generateContent(finalPrompt);
@@ -59,15 +78,15 @@ exports.handler = async (event) => {
     };
 
   } catch (error) {
-    console.error("Error completo:", error);
+    console.error("Error IA:", error);
     let msg = error.message || "Error desconocido";
     
-    if (msg.includes("404")) msg = "Modelo no encontrado. Verifica el nombre del modelo en el código.";
-    if (msg.includes("Timed out") || msg.includes("timed out")) msg = "El análisis tardó demasiado (Timeout).";
+    if (msg.includes("404")) msg = "Modelo IA no encontrado. Verifica la configuración.";
+    if (msg.includes("Timed out") || msg.includes("timed out")) msg = "El análisis tardó demasiado (Timeout de Netlify).";
 
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Error IA", details: msg }),
+      body: JSON.stringify({ error: "Error de IA", details: msg }),
     };
   }
 };

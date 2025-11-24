@@ -1,8 +1,8 @@
 /**
- * Privacy Guard - Lógica con Consolidación y Soporte de Links
+ * Privacy Guard - Versión Experta (Secuencial y Robusta)
  */
 
-// LÍMITE REDUCIDO A 25k para evitar Timeouts de 30s
+// Tamaño de bloque seguro
 const SAFE_CHUNK_SIZE = 25000; 
 
 const elements = {
@@ -25,7 +25,7 @@ const elements = {
     pdfUpload: document.getElementById('pdfUpload')
 };
 
-let currentInputType = 'text'; // 'text' o 'url'
+let currentInputType = 'text';
 
 function init() {
     setupEventListeners();
@@ -33,10 +33,8 @@ function init() {
 }
 
 function setupEventListeners() {
-    // Cambio de modo (Texto vs URL)
     elements.inputModeText.addEventListener('click', () => switchInputMode('text'));
     elements.inputModeUrl.addEventListener('click', () => switchInputMode('url'));
-
     elements.textarea.addEventListener('input', handleTextInput);
     if(elements.pdfUpload) elements.pdfUpload.addEventListener('change', handlePdfUpload);
 }
@@ -54,12 +52,10 @@ function switchInputMode(mode) {
         elements.inputModeText.classList.remove('active-mode');
         elements.urlInputContainer.style.display = 'block';
         elements.textInputContainer.style.display = 'none';
-        elements.analyzeBtn.disabled = false; // Asumimos URL válida al intentar
+        elements.analyzeBtn.disabled = false;
     }
 }
 
-// ... (Lógica PDF se mantiene igual, omitida por brevedad, usa la anterior) ...
-// PEGA AQUÍ LA FUNCIÓN handlePdfUpload DEL CÓDIGO ANTERIOR SI LA NECESITAS
 async function handlePdfUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -78,7 +74,7 @@ async function handlePdfUpload(event) {
         switchInputMode('text');
         toggleLoading(false);
     } catch (error) {
-        alert('Error al leer PDF');
+        alert('Error al leer PDF. Puede estar dañado o protegido.');
         toggleLoading(false);
     }
     event.target.value = '';
@@ -91,31 +87,30 @@ function handleTextInput() {
 }
 
 // ==========================================
-// LÓGICA PRINCIPAL DE ANÁLISIS
+// LÓGICA DE ANÁLISIS ROBUSTA
 // ==========================================
 
 async function analyzePrivacy() {
     hideResults();
     
-    let textToAnalyze = "";
-    
-    // CASO 1: ANÁLISIS POR URL
+    // --- MODO URL ---
     if (currentInputType === 'url') {
         const url = elements.urlInput.value.trim();
         if (!url) { alert('Ingresa una URL válida'); return; }
         
-        toggleLoading(true, "Descargando y analizando sitio web...");
-        
-        // Enviamos la URL directa al backend (sin partir, el backend la descarga)
-        // El backend nos devolverá el análisis directo O el texto para partir.
-        // Para simplificar: Mandamos URL, el backend descarga, si es enorme el backend falla.
-        // MEJOR ESTRATEGIA: El backend descarga y devuelve el ANÁLISIS directo.
-        // Si la web es gigante, usaremos la estrategia de texto.
+        // Expresión regular básica para validar URL
+        if (!url.startsWith('http')) { alert('La URL debe comenzar con http:// o https://'); return; }
+
+        toggleLoading(true, "Accediendo al sitio web y extrayendo contenido...");
         
         try {
-            const result = await callAnalyzeAPI(null, "Analisis Web", 'url', url);
-            // El backend también devuelve 'charCount'
-            processFinalResult(result.content, result.charCount || "Web");
+            // Mandamos URL, el backend se encarga de descargar y analizar
+            // Usamos un prompt que pide resumen directo si cabe
+            const result = await callAnalyzeAPI(null, "Analiza esta Política de Privacidad Web", 'url', url);
+            
+            // Si el backend devuelve el análisis listo
+            processFinalResult(result.content, result.charCount || "Sitio Web");
+
         } catch (error) {
             handleError(error);
         } finally {
@@ -124,63 +119,76 @@ async function analyzePrivacy() {
         return;
     }
 
-    // CASO 2: ANÁLISIS DE TEXTO / PDF
-    textToAnalyze = elements.textarea.value.trim();
+    // --- MODO TEXTO / PDF ---
+    const textToAnalyze = elements.textarea.value.trim();
     if (textToAnalyze.length < 50) return;
 
-    toggleLoading(true, "Analizando documento...");
+    toggleLoading(true, "Iniciando análisis...");
 
-    // Estrategia de División
     if (textToAnalyze.length <= SAFE_CHUNK_SIZE) {
-        // Texto corto: 1 llamada
+        // Texto corto: Análisis directo
         try {
             const result = await callAnalyzeAPI(textToAnalyze, "");
             processFinalResult(result.content, textToAnalyze.length);
         } catch (e) { handleError(e); } finally { toggleLoading(false); }
     } else {
-        // Texto largo: Paralelo + Fusión
+        // Texto largo: Análisis SECUENCIAL (No paralelo, para evitar fallos)
         const chunks = splitTextSafe(textToAnalyze, SAFE_CHUNK_SIZE);
-        toggleLoading(true, `Documento extenso (${chunks.length} partes). Analizando en paralelo...`);
-        await performParallelAnalysis(chunks, textToAnalyze.length);
+        await performSequentialAnalysis(chunks, textToAnalyze.length);
     }
 }
 
-async function performParallelAnalysis(chunks, totalLength) {
+/**
+ * Procesa las partes UNA POR UNA para evitar saturación y timeouts
+ */
+async function performSequentialAnalysis(chunks, totalLength) {
+    const validResults = [];
+
     try {
-        // 1. Enviar todas las partes a la vez
-        const promises = chunks.map((chunk, i) => {
-            const context = `(Parte ${i+1} de ${chunks.length}). Extrae los puntos clave de Datos, Terceros y Riesgos.`;
-            return callAnalyzeAPI(chunk, context);
-        });
+        for (let i = 0; i < chunks.length; i++) {
+            toggleLoading(true, `Analizando parte ${i + 1} de ${chunks.length}... (Por favor espera)`);
+            
+            const context = `(Parte ${i+1} de ${chunks.length}). Extrae SOLAMENTE: Datos personales, Terceros, y Riesgos Críticos. Sé breve.`;
+            
+            try {
+                // Llamada a la API
+                const result = await callAnalyzeAPI(chunks[i], context);
+                
+                // Validación simple de que recibimos texto
+                if (result && result.content && !result.content.includes("ERROR TÉCNICO")) {
+                    validResults.push(result.content);
+                }
+            } catch (err) {
+                console.warn(`Falló la parte ${i+1}, continuamos con la siguiente.`);
+            }
 
-        const results = await Promise.all(promises);
-        
-        // Verificar errores en partes
-        const validResults = results.map(r => r.content).filter(r => !r.includes("ERROR TÉCNICO"));
-        
-        if (validResults.length === 0) throw new Error("Fallaron todas las secciones.");
+            // Pequeña pausa de seguridad para no saturar
+            if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 1000));
+        }
 
-        // 2. FASE DE FUSIÓN (CONSOLIDACIÓN)
-        toggleLoading(true, "Unificando resultados en un solo reporte...");
+        if (validResults.length === 0) {
+            throw new Error("Fallaron todas las secciones. El servidor puede estar saturado.");
+        }
+
+        // FASE DE FUSIÓN
+        toggleLoading(true, "Unificando todas las partes en un reporte final...");
         
-        const combinedText = validResults.join("\n\n--- SIGUIENTE PARTE ---\n\n");
-        const mergePrompt = `Actúa como CISO. Tienes ${validResults.length} reportes parciales de un mismo documento.
+        const combinedText = validResults.join("\n\n--- SIGUIENTE SECCIÓN ---\n\n");
+        const mergePrompt = `Actúa como CISO. He analizado un documento largo en ${validResults.length} partes.
+        A continuación te doy los resúmenes de cada parte.
         
-        TU TAREA: Fusiónalos en UN SOLO reporte final coherente.
-        - No repitas "Parte 1", "Parte 2".
-        - Consolida las listas de datos y terceros.
-        - Resume las banderas rojas más críticas.
+        TU TAREA: Fusiona estos resúmenes en UN SOLO reporte final coherente en Markdown.
         
-        Estructura Final:
+        Estructura:
         ## Resumen Ejecutivo
-        ## Datos Recolectados
+        ## Datos Recolectados (Lista unificada)
         ## Compartición con Terceros
-        ## Banderas Rojas
-        ## Retención y Recomendaciones`;
+        ## Banderas Rojas (Las más críticas de todo el documento)
+        ## Retención y Derechos
+        ## Recomendaciones
+        `;
 
-        // Llamada final para unir todo
-        const finalReport = await callAnalyzeAPI(combinedText, mergePrompt); // Enviamos el resumen como "userText"
-        
+        const finalReport = await callAnalyzeAPI(combinedText, mergePrompt);
         processFinalResult(finalReport.content, totalLength);
 
     } catch (error) {
@@ -206,9 +214,13 @@ async function callAnalyzeAPI(text, promptContext, type = 'text', url = null) {
     });
 
     const data = await response.json();
+    
     if (!response.ok) {
         const msg = data.details || data.error || "Error desconocido";
-        // Si falla una parte en paralelo, devolvemos un texto de error pero no lanzamos excepción para no matar todo
+        // Si estamos en modo URL, lanzamos error para que lo atrape el catch principal
+        if (type === 'url') throw new Error(msg);
+        
+        // Si estamos en modo texto secuencial, devolvemos objeto de error
         return { content: `⚠️ ERROR TÉCNICO EN ESTA PARTE: ${msg}` };
     }
     return data;
@@ -229,14 +241,12 @@ function splitTextSafe(text, maxLength) {
     return chunks;
 }
 
-// Utilidades UI
 function processFinalResult(markdown, chars) {
     elements.reportContent.innerHTML = parseMarkdown(markdown);
-    // Extracción de riesgos (simple)
     const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
     elements.riskContent.innerHTML = risks ? parseMarkdown(risks[0]) : "✅ Sin riesgos críticos detectados.";
     
-    if(elements.statChars) elements.statChars.textContent = chars.toLocaleString();
+    if(elements.statChars) elements.statChars.textContent = typeof chars === 'number' ? chars.toLocaleString() : chars;
     if(elements.statDate) elements.statDate.textContent = new Date().toLocaleDateString();
     
     elements.resultsSection.classList.add('active');
@@ -256,6 +266,5 @@ function toggleLoading(show, txt) {
 function hideResults() { elements.resultsSection.classList.remove('active'); }
 function handleError(e) { alert("Error: " + e.message); toggleLoading(false); }
 
-// Init
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
