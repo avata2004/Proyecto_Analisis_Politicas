@@ -1,5 +1,5 @@
 /**
- * Privacy Guard - Client-Side con Barra de Progreso
+ * Privacy Guard - Versión Final (Prompt Limpio + PDF Fix)
  * Modelo: Gemini 2.5 Flash
  */
 
@@ -22,12 +22,11 @@ const elements = {
     charCount: document.getElementById('charCount'),
     analyzeBtn: document.getElementById('analyzeBtn'),
     
-    // Elementos de Loading y Progreso
+    // Elementos de UI
     loadingState: document.getElementById('loadingState'),
     loadingText: document.getElementById('loadingText'),
     progressBar: document.getElementById('progressBar'),
     loadingPercent: document.getElementById('loadingPercent'),
-    
     resultsSection: document.getElementById('resultsSection'),
     reportContent: document.getElementById('reportContent'),
     riskContent: document.getElementById('riskContent'),
@@ -69,47 +68,42 @@ function switchInputMode(mode) {
     }
 }
 
-// --- NUEVA LÓGICA DE URL (Más robusta) ---
 async function fetchUrlContent(url) {
-    // Usamos 'api.allorigins.win' devolviendo JSON para evitar problemas de CORS
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    
     try {
         const response = await fetch(proxyUrl);
-        
-        if (!response.ok) {
-            throw new Error(`Error de red al conectar con el proxy (${response.status})`);
-        }
-        
+        if (!response.ok) throw new Error("Error de red al conectar");
         const data = await response.json();
-        
-        if (!data || !data.contents) {
-            throw new Error("El sitio web no permitió el acceso o está vacío.");
-        }
+        if (!data || !data.contents) throw new Error("Sitio vacío o bloqueado");
 
-        // Limpieza de HTML
         return data.contents
             .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, " ")
             .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, " ")
             .replace(/<[^>]+>/g, "\n")
             .replace(/\s+/g, " ")
             .trim();
-
     } catch (error) {
-        console.error("Fetch Error:", error);
-        throw new Error("No se pudo descargar la web. Verifica la URL o intenta copiar y pegar el texto manualmente.");
+        throw new Error("No se pudo descargar la web. Intenta copiar el texto manualmente.");
     }
 }
 
 // --- IA DIRECTA ---
 async function callGeminiDirect(text, promptContext) {
-    if (!API_KEY || API_KEY.includes("PEGA_AQUI")) throw new Error("Falta la API Key");
+    if (!API_KEY || API_KEY.includes("PEGA_AQUI")) throw new Error("Falta la API Key en main.js");
 
     const genAI = new GoogleGenerativeAI(API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const systemPrompt = `Actúa como Experto CISO. ${promptContext}
-    Analiza el texto. Genera reporte MARKDOWN estructurado:
+    // === PROMPT AJUSTADO PARA NO DAR SALUDOS ===
+    const systemPrompt = `Actúa como CISO. ${promptContext}
+    
+    INSTRUCCIONES ESTRICTAS DE SALIDA:
+    1. Genera SOLO el reporte en formato MARKDOWN.
+    2. NO incluyas introducciones, saludos, ni texto conversacional al inicio (ej: "Como experto...", "Aquí tienes el reporte").
+    3. NO incluyas conclusiones fuera de la estructura.
+    4. Empieza directamente con el título o el primer encabezado.
+
+    Estructura requerida:
     ## Resumen Ejecutivo
     ## Datos Recolectados
     ## Compartición con Terceros
@@ -117,7 +111,8 @@ async function callGeminiDirect(text, promptContext) {
     ## Retención y Derechos
     ## Recomendaciones`;
 
-    const fullPrompt = `${systemPrompt}\n\n--- TEXTO ---\n${text}`;
+    const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
+    
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     return response.text();
@@ -132,22 +127,16 @@ async function analyzePrivacy() {
         if (currentInputType === 'url') {
             const url = elements.urlInput.value.trim();
             if (!url.startsWith('http')) { alert('URL inválida'); return; }
-            
-            // Carga inicial indeterminada para la URL
             toggleLoading(true, 0, "Descargando sitio web...");
-            
             textToAnalyze = await fetchUrlContent(url);
-            if (textToAnalyze.length < 200) throw new Error("Sitio web vacío o ilegible.");
-            
+            if (textToAnalyze.length < 200) throw new Error("Sitio web vacío.");
         } else {
             textToAnalyze = elements.textarea.value.trim();
         }
 
         if (textToAnalyze.length < 50) return;
 
-        // --- ANÁLISIS ---
         if (textToAnalyze.length <= CHUNK_SIZE) {
-            // Texto corto: 0% -> 50% -> 100%
             toggleLoading(true, 10, "Iniciando análisis...");
             setTimeout(() => updateProgress(50, "Procesando con IA..."), 500);
             
@@ -157,30 +146,23 @@ async function analyzePrivacy() {
             setTimeout(() => processFinalResult(markdown), 800);
             
         } else {
-            // Texto largo (Secuencial con Barra de Progreso)
             const chunks = splitTextSafe(textToAnalyze, CHUNK_SIZE);
             const partials = [];
-            
             toggleLoading(true, 0, "Iniciando análisis secuencial...");
 
             for (let i = 0; i < chunks.length; i++) {
-                // Cálculo de porcentaje: (i / total) * 100
-                // Reservamos el último 10% para la fusión final
                 const progress = Math.round(((i) / chunks.length) * 90);
                 updateProgress(progress, `Analizando sección ${i+1} de ${chunks.length}...`);
-                
                 const context = `(Parte ${i+1} de ${chunks.length}). Extrae puntos clave.`;
                 const res = await callGeminiDirect(chunks[i], context);
                 partials.push(res);
-                
-                // Pequeña pausa visual
                 await new Promise(r => setTimeout(r, 500));
             }
 
-            // Fase final
             updateProgress(90, "Unificando reporte final...");
             const combined = partials.join("\n\n");
-            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes parciales en uno solo coherente.");
+            // Prompt específico para fusión
+            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes parciales en uno solo. NO incluyas saludos, empieza directo con el Markdown.");
             
             updateProgress(100, "¡Listo!");
             setTimeout(() => processFinalResult(finalReport), 800);
@@ -202,16 +184,13 @@ async function handlePdfUpload(event) {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
         let fullText = "";
-        
         for (let i = 1; i <= pdf.numPages; i++) {
             const pct = Math.round((i / pdf.numPages) * 100);
             updateProgress(pct, `Leyendo página ${i} de ${pdf.numPages}...`);
-            
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             fullText += textContent.items.map(item => item.str).join(' ');
         }
-        
         elements.textarea.value = fullText;
         handleTextInput();
         switchInputMode('text');
@@ -245,6 +224,9 @@ function splitTextSafe(text, maxLength) {
 }
 
 function processFinalResult(markdown) {
+    // ⚠️ CRUCIAL: Guardar en variable global para que pdf-generator.js funcione
+    window.currentMarkdown = markdown;
+
     if(window.parseMarkdown) {
         elements.reportContent.innerHTML = window.parseMarkdown(markdown);
         const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
@@ -252,12 +234,12 @@ function processFinalResult(markdown) {
     } else {
         elements.reportContent.innerText = markdown;
     }
+    
     elements.resultsSection.classList.add('active');
     elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
     toggleLoading(false);
 }
 
-// Nueva función de control de carga y progreso
 function toggleLoading(show, percent = 0, text = "Cargando...") {
     if(show) {
         elements.loadingState.classList.add('active');

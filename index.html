@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Guard - Análisis de Privacidad</title>
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
-        rel="stylesheet">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 
     <script type="importmap">
@@ -25,25 +22,19 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 </head>
-
 <body>
     <header class="header">
         <div class="header-content">
             <h1 class="logo-text">Privacy Guard</h1>
-            <p class="tagline">Análisis sin límites de tiempo (Client-Side)</p>
+            <p class="tagline">Análisis potenciado por Gemini 2.5 Flash</p>
         </div>
     </header>
 
     <main class="main-container">
         <section class="input-section">
-            <div class="mode-selector"
-                style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
-                <button id="modeText" class="mode-btn active-mode"
-                    style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄
-                    Texto / PDF</button>
-                <button id="modeUrl" class="mode-btn"
-                    style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">🔗
-                    Enlace Web</button>
+            <div class="mode-selector" style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+                <button id="modeText" class="mode-btn active-mode" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄 Texto / PDF</button>
+                <button id="modeUrl" class="mode-btn" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">🔗 Enlace Web</button>
             </div>
 
             <div class="input-container">
@@ -51,13 +42,10 @@
                     <div class="input-header">
                         <label class="input-label">Texto o Archivo PDF</label>
                         <input type="file" id="pdfUpload" accept=".pdf" hidden>
-                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">📂 Subir
-                            PDF</button>
+                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">📂 Subir PDF</button>
                     </div>
-                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí..."
-                        rows="10"></textarea>
-                    <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span>
-                    </div>
+                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí..." rows="10"></textarea>
+                    <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span></div>
                 </div>
 
                 <div id="urlInputContainer" style="display: none;">
@@ -71,11 +59,9 @@
 
         <div id="loadingState" class="loading-state">
             <div class="loader"></div>
-
             <div class="progress-container">
                 <div id="progressBar" class="progress-bar"></div>
             </div>
-
             <p class="loading-text">
                 <span id="loadingPercent">0%</span> - <span id="loadingText">Iniciando...</span>
             </p>
@@ -87,7 +73,19 @@
                 <button class="tab-btn" onclick="switchTab(1)">⚠️ Riesgos</button>
             </nav>
             <div class="tabs-content">
-                <div class="tab-panel active" id="reportContent"></div>
+                <div class="tab-panel active">
+                    <div id="reportContent" class="report-content"></div>
+                    
+                    <div class="actions-bar">
+                        <button class="btn-download" onclick="downloadPDF()">
+                            <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            </svg>
+                            <span>Descargar Reporte PDF</span>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="tab-panel" id="riskContent"></div>
             </div>
         </section>
@@ -95,8 +93,7 @@
 
     <script src="js/markdown-parser.js"></script>
     <script src="js/pdf-generator.js"></script>
-
+    
     <script type="module" src="js/main.js"></script>
 </body>
-
 </html>
