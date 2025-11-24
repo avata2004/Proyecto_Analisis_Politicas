@@ -1,9 +1,10 @@
 /**
- * Privacy Guard - Versión Experta (Secuencial y Robusta)
+ * Privacy Guard - Versión Ultra-Segura (Límites Bajos + CORS Proxy)
  */
 
-// Tamaño de bloque seguro
-const SAFE_CHUNK_SIZE = 25000; 
+// LÍMITE AGRESIVO: 12k caracteres asegura respuestas en <6 segundos.
+// Esto evita el corte de 10s de Netlify Free.
+const SAFE_CHUNK_SIZE = 12000; 
 
 const elements = {
     textarea: document.getElementById('privacyText'),
@@ -56,6 +57,28 @@ function switchInputMode(mode) {
     }
 }
 
+// --- UTILIDAD: Descargar URL desde el Navegador (Evita Bloqueo 403) ---
+async function fetchUrlContent(url) {
+    // Usamos un proxy CORS gratuito para evitar bloqueos directos
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error("No se pudo conectar al Proxy");
+    
+    const data = await response.json();
+    if (!data.contents) throw new Error("El sitio web no devolvió contenido legible");
+
+    // Limpieza de HTML en el cliente
+    let cleanText = data.contents
+        .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, " ")
+        .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, " ")
+        .replace(/<[^>]+>/g, "\n")
+        .replace(/\s+/g, " ")
+        .trim();
+        
+    return cleanText;
+}
+
 async function handlePdfUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -74,7 +97,7 @@ async function handlePdfUpload(event) {
         switchInputMode('text');
         toggleLoading(false);
     } catch (error) {
-        alert('Error al leer PDF. Puede estar dañado o protegido.');
+        alert('Error al leer PDF. Puede estar dañado.');
         toggleLoading(false);
     }
     event.target.value = '';
@@ -87,141 +110,119 @@ function handleTextInput() {
 }
 
 // ==========================================
-// LÓGICA DE ANÁLISIS ROBUSTA
+// LÓGICA DE ANÁLISIS
 // ==========================================
 
 async function analyzePrivacy() {
     hideResults();
-    
-    // --- MODO URL ---
-    if (currentInputType === 'url') {
-        const url = elements.urlInput.value.trim();
-        if (!url) { alert('Ingresa una URL válida'); return; }
-        
-        // Expresión regular básica para validar URL
-        if (!url.startsWith('http')) { alert('La URL debe comenzar con http:// o https://'); return; }
-
-        toggleLoading(true, "Accediendo al sitio web y extrayendo contenido...");
-        
-        try {
-            // Mandamos URL, el backend se encarga de descargar y analizar
-            // Usamos un prompt que pide resumen directo si cabe
-            const result = await callAnalyzeAPI(null, "Analiza esta Política de Privacidad Web", 'url', url);
-            
-            // Si el backend devuelve el análisis listo
-            processFinalResult(result.content, result.charCount || "Sitio Web");
-
-        } catch (error) {
-            handleError(error);
-        } finally {
-            toggleLoading(false);
-        }
-        return;
-    }
-
-    // --- MODO TEXTO / PDF ---
-    const textToAnalyze = elements.textarea.value.trim();
-    if (textToAnalyze.length < 50) return;
-
-    toggleLoading(true, "Iniciando análisis...");
-
-    if (textToAnalyze.length <= SAFE_CHUNK_SIZE) {
-        // Texto corto: Análisis directo
-        try {
-            const result = await callAnalyzeAPI(textToAnalyze, "");
-            processFinalResult(result.content, textToAnalyze.length);
-        } catch (e) { handleError(e); } finally { toggleLoading(false); }
-    } else {
-        // Texto largo: Análisis SECUENCIAL (No paralelo, para evitar fallos)
-        const chunks = splitTextSafe(textToAnalyze, SAFE_CHUNK_SIZE);
-        await performSequentialAnalysis(chunks, textToAnalyze.length);
-    }
-}
-
-/**
- * Procesa las partes UNA POR UNA para evitar saturación y timeouts
- */
-async function performSequentialAnalysis(chunks, totalLength) {
-    const validResults = [];
+    let textToAnalyze = "";
 
     try {
-        for (let i = 0; i < chunks.length; i++) {
-            toggleLoading(true, `Analizando parte ${i + 1} de ${chunks.length}... (Por favor espera)`);
-            
-            const context = `(Parte ${i+1} de ${chunks.length}). Extrae SOLAMENTE: Datos personales, Terceros, y Riesgos Críticos. Sé breve.`;
-            
-            try {
-                // Llamada a la API
-                const result = await callAnalyzeAPI(chunks[i], context);
-                
-                // Validación simple de que recibimos texto
-                if (result && result.content && !result.content.includes("ERROR TÉCNICO")) {
-                    validResults.push(result.content);
-                }
-            } catch (err) {
-                console.warn(`Falló la parte ${i+1}, continuamos con la siguiente.`);
-            }
+        // --- MODO URL ---
+        if (currentInputType === 'url') {
+            const url = elements.urlInput.value.trim();
+            if (!url) { alert('URL inválida'); return; }
+            if (!url.startsWith('http')) { alert('Usa http:// o https://'); return; }
 
-            // Pequeña pausa de seguridad para no saturar
-            if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 1000));
+            toggleLoading(true, "Descargando sitio web desde tu navegador...");
+            textToAnalyze = await fetchUrlContent(url);
+            
+            if (textToAnalyze.length < 200) throw new Error("El sitio web parece vacío o bloqueó el acceso.");
+            console.log(`Sitio descargado: ${textToAnalyze.length} caracteres.`);
+        } 
+        // --- MODO TEXTO ---
+        else {
+            textToAnalyze = elements.textarea.value.trim();
         }
 
-        if (validResults.length === 0) {
-            throw new Error("Fallaron todas las secciones. El servidor puede estar saturado.");
+        if (textToAnalyze.length < 50) return;
+
+        // Estrategia de Análisis
+        if (textToAnalyze.length <= SAFE_CHUNK_SIZE) {
+            toggleLoading(true, "Analizando documento...");
+            const result = await callAnalyzeAPI(textToAnalyze, "");
+            processFinalResult(result.content, textToAnalyze.length);
+        } else {
+            const chunks = splitTextSafe(textToAnalyze, SAFE_CHUNK_SIZE);
+            await performSequentialAnalysis(chunks, textToAnalyze.length);
         }
-
-        // FASE DE FUSIÓN
-        toggleLoading(true, "Unificando todas las partes en un reporte final...");
-        
-        const combinedText = validResults.join("\n\n--- SIGUIENTE SECCIÓN ---\n\n");
-        const mergePrompt = `Actúa como CISO. He analizado un documento largo en ${validResults.length} partes.
-        A continuación te doy los resúmenes de cada parte.
-        
-        TU TAREA: Fusiona estos resúmenes en UN SOLO reporte final coherente en Markdown.
-        
-        Estructura:
-        ## Resumen Ejecutivo
-        ## Datos Recolectados (Lista unificada)
-        ## Compartición con Terceros
-        ## Banderas Rojas (Las más críticas de todo el documento)
-        ## Retención y Derechos
-        ## Recomendaciones
-        `;
-
-        const finalReport = await callAnalyzeAPI(combinedText, mergePrompt);
-        processFinalResult(finalReport.content, totalLength);
 
     } catch (error) {
         handleError(error);
-    } finally {
-        toggleLoading(false);
     }
 }
 
-async function callAnalyzeAPI(text, promptContext, type = 'text', url = null) {
-    const systemPrompt = `Eres un experto en Ciberseguridad. ${promptContext}
-    Genera un reporte MARKDOWN conciso.`;
+async function performSequentialAnalysis(chunks, totalLength) {
+    const validResults = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+        let success = false;
+        let retries = 0;
+        
+        // Reintento simple por si falla una vez
+        while(!success && retries < 2) {
+            try {
+                toggleLoading(true, `Analizando parte ${i + 1} de ${chunks.length}... ${retries > 0 ? '(Reintentando)' : ''}`);
+                
+                const context = `(Parte ${i+1} de ${chunks.length}). Extrae: Datos personales, Terceros, Riesgos. Sé breve.`;
+                const result = await callAnalyzeAPI(chunks[i], context);
+                
+                if (result && result.content && !result.content.includes("ERROR TÉCNICO")) {
+                    validResults.push(result.content);
+                    success = true;
+                } else {
+                    throw new Error("Respuesta inválida");
+                }
+            } catch (err) {
+                console.warn(`Error en parte ${i+1}:`, err);
+                retries++;
+                await new Promise(r => setTimeout(r, 2000)); // Esperar 2s antes de reintentar
+            }
+        }
+        
+        // Pausa entre bloques exitosos para no saturar
+        if(success && i < chunks.length - 1) await new Promise(r => setTimeout(r, 1000));
+    }
+
+    if (validResults.length === 0) {
+        throw new Error("El servidor está saturado y no pudo procesar las secciones. Intenta con un texto más corto.");
+    }
+
+    // FUSIÓN
+    toggleLoading(true, "Generando reporte final...");
+    try {
+        const combinedText = validResults.join("\n\n--- SECCIÓN ---\n\n");
+        const mergePrompt = `Actúa como CISO. Fusiona estos ${validResults.length} resúmenes parciales en UN reporte final coherente.
+        Elimina duplicados.
+        Estructura:
+        ## Resumen Ejecutivo
+        ## Datos Recolectados
+        ## Compartición con Terceros
+        ## Banderas Rojas (Críticas)
+        ## Retención y Derechos
+        ## Recomendaciones`;
+
+        const finalReport = await callAnalyzeAPI(combinedText, mergePrompt);
+        processFinalResult(finalReport.content, totalLength);
+    } catch (e) {
+        // Si falla la fusión, mostramos lo que tenemos
+        processFinalResult("# Reporte Parcial (Fusión fallida)\n" + validResults.join("\n\n"), totalLength);
+    }
+}
+
+async function callAnalyzeAPI(text, promptContext) {
+    const systemPrompt = `Eres experto en Ciberseguridad. ${promptContext} Genera reporte MARKDOWN.`;
 
     const response = await fetch("/.netlify/functions/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            systemPrompt: systemPrompt,
-            userText: text,
-            inputType: type,
-            linkUrl: url
-        })
+        body: JSON.stringify({ systemPrompt, userText: text })
     });
 
     const data = await response.json();
-    
     if (!response.ok) {
-        const msg = data.details || data.error || "Error desconocido";
-        // Si estamos en modo URL, lanzamos error para que lo atrape el catch principal
-        if (type === 'url') throw new Error(msg);
-        
-        // Si estamos en modo texto secuencial, devolvemos objeto de error
-        return { content: `⚠️ ERROR TÉCNICO EN ESTA PARTE: ${msg}` };
+        const msg = data.details || data.error || "Error";
+        throw new Error(msg);
     }
     return data;
 }
@@ -244,11 +245,9 @@ function splitTextSafe(text, maxLength) {
 function processFinalResult(markdown, chars) {
     elements.reportContent.innerHTML = parseMarkdown(markdown);
     const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
-    elements.riskContent.innerHTML = risks ? parseMarkdown(risks[0]) : "✅ Sin riesgos críticos detectados.";
-    
+    elements.riskContent.innerHTML = risks ? parseMarkdown(risks[0]) : "✅ Sin riesgos críticos.";
     if(elements.statChars) elements.statChars.textContent = typeof chars === 'number' ? chars.toLocaleString() : chars;
     if(elements.statDate) elements.statDate.textContent = new Date().toLocaleDateString();
-    
     elements.resultsSection.classList.add('active');
     elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
@@ -264,7 +263,11 @@ function toggleLoading(show, txt) {
 }
 
 function hideResults() { elements.resultsSection.classList.remove('active'); }
-function handleError(e) { alert("Error: " + e.message); toggleLoading(false); }
+function handleError(e) { 
+    console.error(e); 
+    alert("Error: " + e.message); 
+    toggleLoading(false); 
+}
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
