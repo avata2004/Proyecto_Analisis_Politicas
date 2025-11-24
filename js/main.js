@@ -1,13 +1,17 @@
 /**
- * Privacy Guard - Main Application Logic
- * Versión simplificada para uso con Google Gemini 1.5 Flash
+ * Privacy Guard - Lógica Principal
+ * Optimizado con Procesamiento en Paralelo para evitar Timeouts de Netlify
  */
 
 // Variables globales
 let currentMarkdown = '';
 let currentCharCount = 0;
 
-// Elementos del DOM
+// Configuración de límites
+// Netlify Free corta a los 10s. Gemini Flash procesa ~40k chars en 7-8s.
+// Si el texto pasa de 45k, lo dividimos para procesarlo en paralelo.
+const SAFE_CHUNK_SIZE = 45000; 
+
 const elements = {
     textarea: document.getElementById('privacyText'),
     charCount: document.getElementById('charCount'),
@@ -19,7 +23,7 @@ const elements = {
     riskContent: document.getElementById('riskContent'),
     statChars: document.getElementById('statChars'),
     statDate: document.getElementById('statDate'),
-    statModel: document.getElementById('statModel'), // Si decidiste dejarlo en el HTML
+    statModel: document.getElementById('statModel'),
     pdfUpload: document.getElementById('pdfUpload')
 };
 
@@ -36,7 +40,7 @@ function setupEventListeners() {
 }
 
 // ==========================================
-// LÓGICA DE PDF (Sin cambios)
+// LÓGICA DE PDF (Estándar)
 // ==========================================
 async function handlePdfUpload(event) {
     const file = event.target.files[0];
@@ -65,7 +69,7 @@ async function handlePdfUpload(event) {
 
     } catch (error) {
         console.error('Error al leer PDF:', error);
-        alert('❌ Error al leer el archivo PDF. Asegúrate de que no esté protegido.');
+        alert('❌ Error al leer el PDF. Verifica que no tenga contraseña.');
         toggleLoading(false);
     }
     event.target.value = '';
@@ -78,81 +82,61 @@ function handleTextInput() {
 }
 
 // ==========================================
-// LÓGICA DE ANÁLISIS (SIMPLIFICADA PARA GEMINI)
+// LÓGICA DE ANÁLISIS EN PARALELO
 // ==========================================
 
 async function analyzePrivacy() {
     const text = elements.textarea.value.trim();
-
-    // Validación básica
     if (text.length < 50) {
-        alert('⚠️ El texto es muy corto para un análisis significativo (mínimo 50 caracteres).');
+        alert('⚠️ El texto es muy corto.');
         return;
     }
 
-    // Mensaje de carga
-    toggleLoading(true, "Analizando documento completo con IA...");
+    // Decisión de estrategia basada en longitud
+    if (text.length <= SAFE_CHUNK_SIZE) {
+        // Estrategia Simple (1 Petición)
+        toggleLoading(true, "Analizando documento con IA...");
+        await performAnalysis([text]); 
+    } else {
+        // Estrategia Paralela (>45k chars)
+        // Dividimos y enviamos todo a la vez para "burlar" el límite de tiempo total
+        const chunks = splitTextSafe(text, SAFE_CHUNK_SIZE);
+        toggleLoading(true, `Documento extenso detectado. Analizando ${chunks.length} secciones en paralelo...`);
+        await performAnalysis(chunks);
+    }
+}
 
-    // Prompt del sistema (Instrucciones para Gemini)
-    const systemPrompt = `Actúa como un experto senior en Ciberseguridad y Privacidad de Datos (CISO).
-Tu tarea es analizar los siguientes "Términos y Condiciones" o "Política de Privacidad".
-
-Debes generar un reporte estructurado estrictamente en formato MARKDOWN.
-El tono debe ser profesional, objetivo y claro para un usuario promedio.
-
-Estructura OBLIGATORIA de la respuesta:
-
-## Resumen Ejecutivo
-(Un párrafo conciso de máx 100 palabras sobre el nivel general de intrusión).
-
-## Datos Personales Recolectados
-(Lista con viñetas exhaustiva de qué datos se llevan: e.g., • Datos de contacto, • Ubicación precisa, • Datos biométricos).
-
-## Compartición con Terceros
-(¿A quién le dan los datos? Socios, anunciantes, autoridades).
-
-## Banderas Rojas (Riesgos Altos)
-(Analiza críticamente: cláusulas abusivas, renuncias de derechos, retención indefinida, venta de datos. Si no hay riesgos graves, indícalo).
-
-## Retención y Derechos
-(Cuánto tiempo guardan los datos y el proceso para borrarlos).
-
-## Recomendaciones de Seguridad
-(3 consejos prácticos accionables para el usuario).
-
-Si el texto proporcionado NO parece ser un documento legal, responde ÚNICAMENTE: "ERROR_CONTEXTO".`;
-
+/**
+ * Ejecuta el análisis (sea 1 o varios bloques)
+ */
+async function performAnalysis(chunks) {
     try {
-        // Llamada única a la API
-        const response = await fetch("/.netlify/functions/analyze", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                systemPrompt: systemPrompt,
-                userText: text
-            })
+        // Creamos una "promesa" por cada bloque para enviarlos simultáneamente
+        const promises = chunks.map((chunk, index) => {
+            const isMulti = chunks.length > 1;
+            // Si hay varios bloques, ajustamos levemente el prompt para que la IA sepa contexto
+            const context = isMulti ? `(Parte ${index + 1} de ${chunks.length} del documento).` : "";
+            return callAnalyzeAPI(chunk, context);
         });
 
-        if (!response.ok) {
-            // Intentar leer el mensaje de error del backend si existe
-            let errorMsg = `Error ${response.status}`;
-            try {
-                const errorData = await response.json();
-                errorMsg = errorData.error || errorMsg;
-            } catch(e) {}
-            throw new Error(errorMsg);
+        // Promise.all espera a que TODAS las peticiones terminen.
+        // Como van en paralelo, si cada una tarda 8s, el total es ~8-9s.
+        const results = await Promise.all(promises);
+
+        // Unimos los resultados
+        let finalMarkdown = "";
+        
+        if (results.length === 1) {
+            finalMarkdown = results[0];
+        } else {
+            // Si hay varios, los unimos con separadores claros
+            finalMarkdown = "# 📑 REPORTE DE ANÁLISIS COMPLETO\n\n";
+            finalMarkdown += results.map((res, i) => 
+                `## 🔹 Análisis de la Sección ${i + 1}\n${res}`
+            ).join("\n\n---\n\n");
         }
 
-        const data = await response.json();
-        const aiResponse = data.content;
-
-        // Validar respuesta de contexto
-        if (aiResponse && aiResponse.includes('ERROR_CONTEXTO')) {
-            alert('❌ El texto analizado no parece ser un documento legal válido.');
-            return;
-        }
-
-        processFinalResult(aiResponse, text.length);
+        processFinalResult(finalMarkdown, elements.textarea.value.length);
 
     } catch (error) {
         handleError(error);
@@ -161,35 +145,94 @@ Si el texto proporcionado NO parece ser un documento legal, responde ÚNICAMENTE
     }
 }
 
+/**
+ * Llama a la API (Backend)
+ */
+async function callAnalyzeAPI(textChunk, contextNote) {
+    const systemPrompt = `Actúa como CISO experto.
+    Analiza este texto legal ${contextNote}.
+    
+    Genera un reporte MARKDOWN conciso.
+    Estructura:
+    ## Resumen Ejecutivo (Breve)
+    ## Datos Recolectados (Lista)
+    ## Compartición con Terceros
+    ## Banderas Rojas (Riesgos Críticos)
+    ## Retención y Derechos
+    
+    Sé directo. Evita introducciones largas.`;
+
+    const response = await fetch("/.netlify/functions/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            systemPrompt: systemPrompt,
+            userText: textChunk
+        })
+    });
+
+    if (!response.ok) {
+        // Si una parte falla por timeout, devolvemos un mensaje de error parcial
+        // para no romper todo el reporte.
+        if (response.status === 500 || response.status === 502) {
+             return "⚠️ **Error en esta sección:** El análisis tardó demasiado. Revisa manualmente esta parte del texto.";
+        }
+        throw new Error(`Error API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.content;
+}
 
 /**
- * Procesa y muestra los resultados finales
+ * Divide el texto sin cortar palabras
  */
+function splitTextSafe(text, maxLength) {
+    const chunks = [];
+    let currentChunk = '';
+    const paragraphs = text.split('\n');
+
+    for (let paragraph of paragraphs) {
+        if ((currentChunk + paragraph).length > maxLength) {
+            chunks.push(currentChunk);
+            currentChunk = '';
+        }
+        currentChunk += paragraph + '\n';
+        
+        // Si un solo párrafo es gigante (raro, pero posible)
+        if (currentChunk.length > maxLength) {
+             chunks.push(currentChunk);
+             currentChunk = '';
+        }
+    }
+    if (currentChunk.trim()) chunks.push(currentChunk);
+    return chunks;
+}
+
+// ==========================================
+// UTILIDADES UI (Resultados y Carga)
+// ==========================================
+
 function processFinalResult(markdown, totalChars) {
     currentMarkdown = markdown;
     currentCharCount = totalChars;
 
-    // Renderizar Markdown completo
     elements.reportContent.innerHTML = parseMarkdown(markdown);
 
-    // Extraer sección de riesgos para su pestaña
-    const risksMatch = markdown.match(/## Banderas Rojas[\s\S]*?(?=## Retención|## |$)/);
+    // Extraemos banderas rojas de TODO el documento combinado
+    const allRisks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |---|$))/g);
     
-    if (risksMatch && risksMatch[0].length > 30) {
-        elements.riskContent.innerHTML = parseMarkdown(risksMatch[0]);
+    if (allRisks && allRisks.length > 0) {
+        const riskHtml = allRisks.map(r => parseMarkdown(r)).join('<hr class="risk-separator">');
+        elements.riskContent.innerHTML = riskHtml;
     } else {
-        elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se detectaron banderas rojas críticas en el análisis.</p>';
+        elements.riskContent.innerHTML = '<p style="color: #10b981;">✅ No se detectaron riesgos críticos evidentes.</p>';
     }
 
     updateStatistics(totalChars);
     showResults();
     switchTab(0);
 }
-
-
-// ==========================================
-// UTILIDADES DE UI
-// ==========================================
 
 function toggleLoading(show, text = "Cargando...") {
     if (show) {
@@ -223,10 +266,7 @@ function switchTab(index) {
 
 function updateStatistics(charCount) {
     if(elements.statChars) elements.statChars.textContent = charCount.toLocaleString();
-    
-    // Si decidiste mantener el elemento en el HTML, lo actualizamos
     if(elements.statModel) elements.statModel.textContent = "Gemini 1.5 Flash";
-
     if(elements.statDate) {
         elements.statDate.textContent = new Date().toLocaleDateString('es-MX', {
             year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -235,8 +275,8 @@ function updateStatistics(charCount) {
 }
 
 function handleError(error) {
-    console.error('Error completo:', error);
-    alert(`❌ Ha ocurrido un error: ${error.message}\n\nSi el documento es extremadamente largo, podría ser un límite de tiempo del servidor gratuito.`);
+    console.error('Error:', error);
+    alert(`❌ Hubo un problema: ${error.message}`);
     toggleLoading(false);
 }
 
