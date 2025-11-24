@@ -35,7 +35,7 @@
             <h2 class="section-title">Entiende lo que aceptas antes de firmar</h2>
             <p class="section-description">
                 Sube un contrato PDF, pega el texto o ingresa un enlace web. 
-                Nuestra IA analizará las letras pequeñas para detectar <strong>riesgos, cláusulas abusivas y uso de tus datos</strong>.
+                Nuestra IA analizará las letras pequeñas para detectar <strong>riesgos, cláusulas abusivas y uso de tus datos.</strong>
             </p>
         </section>
 
@@ -50,7 +50,7 @@
                     <div class="input-header">
                         <label class="input-label">Texto o Archivo PDF</label>
                         <input type="file" id="pdfUpload" accept=".pdf" hidden>
-                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">📂 Subir PDF</button>
+                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">Subir PDF</button>
                     </div>
                     <textarea id="privacyText" class="text-input" placeholder="Pega el texto de los términos y condiciones aquí..." rows="10"></textarea>
                     <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span></div>
@@ -99,6 +99,15 @@
             </div>
         </section>
     </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p class="footer-text">
+                <strong>Privacy Guard</strong> · Tu privacidad es importante · 
+                Los documentos no se almacenan en nuestros servidores
+            </p>
+        </div>
+    </footer>
 
     <script src="js/markdown-parser.js"></script>
     <script src="js/pdf-generator.js"></script>
