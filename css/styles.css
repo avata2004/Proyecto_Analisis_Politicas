@@ -690,3 +690,9 @@ body {
     width: 16px;
     height: 16px;
 }
+
+.mode-btn.active-mode {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary) !important;
+}
+.mode-btn { color: #64748b; }

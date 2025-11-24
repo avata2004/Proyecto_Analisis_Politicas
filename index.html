@@ -41,29 +41,37 @@
         </section>
 
         <section class="input-section">
+            <div class="mode-selector" style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+                <button id="modeText" class="mode-btn active-mode" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">
+                    📄 Texto / PDF
+                </button>
+                <button id="modeUrl" class="mode-btn" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">
+                    🔗 Enlace Web
+                </button>
+            </div>
+
             <div class="input-container">
-                <div class="input-header">
-                    <label for="privacyText" class="input-label">
-                        <span>Texto o Archivo PDF</span>
-                    </label>
-
-                    <input type="file" id="pdfUpload" accept=".pdf" hidden>
-                    <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">
-                        <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-                        </svg>
-                        Subir PDF
-                    </button>
+                
+                <div id="textInputContainer">
+                    <div class="input-header">
+                        <label class="input-label">Texto o Archivo PDF</label>
+                        <input type="file" id="pdfUpload" accept=".pdf" hidden>
+                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">
+                            📂 Subir PDF
+                        </button>
+                    </div>
+                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí..." rows="10"></textarea>
+                    <div class="input-footer">
+                        <span class="char-counter"><span id="charCount">0</span> caracteres</span>
+                    </div>
                 </div>
 
-                <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí o sube un archivo PDF..."
-                    rows="10"></textarea>
-                <div class="input-footer">
-                    <span class="char-counter">
-                        <span id="charCount">0</span> caracteres
-                    </span>
-                    <span class="input-hint">Mínimo 50 caracteres</span>
+                <div id="urlInputContainer" style="display: none;">
+                    <label class="input-label">Dirección del sitio web</label>
+                    <input type="url" id="urlInput" class="text-input" placeholder="https://ejemplo.com/privacidad" style="height: auto; min-height: 50px;">
+                    <p class="input-hint" style="margin-top: 0.5rem;">Analizaremos el contenido de texto visible en la página.</p>
                 </div>
+
             </div>
 
             <button id="analyzeBtn" class="btn-primary" onclick="analyzePrivacy()">

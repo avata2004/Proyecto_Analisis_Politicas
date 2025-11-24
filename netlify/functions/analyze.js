@@ -1,37 +1,53 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 exports.handler = async (event) => {
-  // 1. Solo permitir peticiones POST
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
-  // 2. Verificar API Key
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "Falta la API Key en la configuración del servidor." })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: "Falta API Key" }) };
   }
 
   try {
-    const { systemPrompt, userText } = JSON.parse(event.body);
+    const body = JSON.parse(event.body);
+    let { systemPrompt, userText, inputType, linkUrl } = body;
 
-    // 3. Inicializar Google AI
+    // --- LÓGICA NUEVA PARA LINKS ---
+    if (inputType === 'url' && linkUrl) {
+        try {
+            console.log("Descargando URL:", linkUrl);
+            const response = await fetch(linkUrl);
+            if (!response.ok) throw new Error("No se pudo acceder a la URL");
+            const html = await response.text();
+            
+            // Limpieza básica de HTML para obtener solo texto (sin librerías pesadas)
+            userText = html
+                .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, "") // Quitar scripts
+                .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, "")   // Quitar estilos
+                .replace(/<[^>]+>/g, "\n")                              // Quitar tags HTML
+                .replace(/\s+/g, " ")                                   // Normalizar espacios
+                .trim();
+                
+            if (userText.length < 100) throw new Error("No se encontró texto suficiente en la web.");
+            
+        } catch (err) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ error: `Error leyendo la URL: ${err.message}` })
+            };
+        }
+    }
+
+    // Inicializar Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
+    // Usamos 'gemini-1.5-flash' (o 'gemini-2.5-flash' si tu cuenta lo tiene)
+    // Flash es CRÍTICO para velocidad.
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // === CAMBIO CLAVE AQUÍ ===
-    // Usamos el modelo que aparece en tu lista: "Gemini 2.5 Flash".
-    // ID probable: "gemini-2.5-flash" (o "gemini-2.5-flash-001" a veces).
-    // Usamos la versión Flash para evitar el timeout de 10s de Netlify.
-    // Si quisieras el 3 Pro, cambiarías esto a "gemini-3-pro", pero podría ser muy lento.
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const finalPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${userText}`;
 
-    // 4. Configurar Prompt
-    const finalPrompt = `${systemPrompt}\n\n--- DOCUMENTO A ANALIZAR ---\n${userText}`;
-
-    // 5. Generar contenido
     const result = await model.generateContent(finalPrompt);
     const response = await result.response;
     const text = response.text();
@@ -39,26 +55,19 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: text }),
+      body: JSON.stringify({ content: text, charCount: userText.length }),
     };
 
   } catch (error) {
-    console.error("Error Gemini:", error);
+    console.error("Error completo:", error);
+    let msg = error.message || "Error desconocido";
     
-    let errorMessage = error.message || "Error desconocido";
-    
-    // Si vuelve a dar 404, es posible que el ID interno sea ligeramente diferente
-    if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-        errorMessage = `El modelo 'gemini-2.5-flash' no fue encontrado. 
-        Revisa en Google AI Studio el botón 'Get Code' para ver el ID exacto (ej. gemini-2.5-flash-001).`;
-    }
+    if (msg.includes("404")) msg = "Modelo no encontrado. Verifica el nombre del modelo en el código.";
+    if (msg.includes("Timed out") || msg.includes("timed out")) msg = "El análisis tardó demasiado (Timeout).";
 
     return {
       statusCode: 500,
-      body: JSON.stringify({ 
-          error: "Error procesando con IA", 
-          details: errorMessage 
-      }),
+      body: JSON.stringify({ error: "Error IA", details: msg }),
     };
   }
 };
