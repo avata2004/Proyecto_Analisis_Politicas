@@ -1,180 +1,82 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Analiza políticas de privacidad con inteligencia artificial">
-    <title>Privacy Guard - Análisis de Privacidad con IA</title>
+    <title>Privacy Guard - Análisis de Privacidad</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
-        rel="stylesheet">
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
-    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 </head>
-
 <body>
     <header class="header">
         <div class="header-content">
-            <div class="logo-section">
-                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <h1 class="logo-text">Privacy Guard</h1>
-            </div>
-            <p class="tagline">Análisis inteligente de políticas de privacidad</p>
+            <h1 class="logo-text">Privacy Guard</h1>
+            <p class="tagline">Análisis sin límites de tiempo (Client-Side)</p>
         </div>
     </header>
 
     <main class="main-container">
-        <section class="intro-section">
-            <h2 class="section-title">Protege tu privacidad con inteligencia</h2>
-            <p class="section-description">
-                Analiza términos y condiciones en segundos. Nuestra IA identifica riesgos ocultos
-                y te proporciona un análisis detallado en lenguaje claro. Sube un PDF o pega el texto </p>
-        </section>
-
         <section class="input-section">
             <div class="mode-selector" style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
-                <button id="modeText" class="mode-btn active-mode" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">
-                    📄 Texto / PDF
-                </button>
-                <button id="modeUrl" class="mode-btn" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">
-                    🔗 Enlace Web
-                </button>
+                <button id="modeText" class="mode-btn active-mode" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄 Texto / PDF</button>
+                <button id="modeUrl" class="mode-btn" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">🔗 Enlace Web</button>
             </div>
 
             <div class="input-container">
-                
                 <div id="textInputContainer">
                     <div class="input-header">
                         <label class="input-label">Texto o Archivo PDF</label>
                         <input type="file" id="pdfUpload" accept=".pdf" hidden>
-                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">
-                            📂 Subir PDF
-                        </button>
+                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">📂 Subir PDF</button>
                     </div>
                     <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí..." rows="10"></textarea>
-                    <div class="input-footer">
-                        <span class="char-counter"><span id="charCount">0</span> caracteres</span>
-                    </div>
+                    <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span></div>
                 </div>
 
                 <div id="urlInputContainer" style="display: none;">
                     <label class="input-label">Dirección del sitio web</label>
-                    <input type="url" id="urlInput" class="text-input" placeholder="https://ejemplo.com/privacidad" style="height: auto; min-height: 50px;">
-                    <p class="input-hint" style="margin-top: 0.5rem;">Analizaremos el contenido de texto visible en la página.</p>
+                    <input type="url" id="urlInput" class="text-input" placeholder="https://ejemplo.com">
                 </div>
-
             </div>
 
-            <button id="analyzeBtn" class="btn-primary" onclick="analyzePrivacy()">
-                <span>Analizar Documento</span>
-            </button>
+            <button id="analyzeBtn" class="btn-primary"><span>Analizar Documento</span></button>
         </section>
 
         <div id="loadingState" class="loading-state">
             <div class="loader"></div>
-            <p class="loading-text" id="loadingText">Analizando documento...</p>
-            <p class="loading-subtext">Esto tomará unos segundos</p>
+            <p class="loading-text" id="loadingText">Procesando...</p>
         </div>
 
         <section id="resultsSection" class="results-section">
-            <div class="alert-success">
-                <svg class="alert-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
-                <span>Análisis completado exitosamente</span>
-            </div>
-
             <nav class="tabs-nav">
-                <button class="tab-btn active" onclick="switchTab(0)" data-tab="0">
-                    <span class="tab-icon">📊</span>
-                    <span>Reporte Completo</span>
-                </button>
-                <button class="tab-btn" onclick="switchTab(1)" data-tab="1">
-                    <span class="tab-icon">⚠️</span>
-                    <span>Alertas de Riesgo</span>
-                </button>
-                <button class="tab-btn" onclick="switchTab(2)" data-tab="2">
-                    <span class="tab-icon">📈</span>
-                    <span>Estadísticas</span>
-                </button>
+                <button class="tab-btn active" onclick="switchTab(0)">📊 Reporte</button>
+                <button class="tab-btn" onclick="switchTab(1)">⚠️ Riesgos</button>
             </nav>
-
             <div class="tabs-content">
-                <div class="tab-panel active" data-panel="0">
-                    <div class="report-content" id="reportContent"></div>
-
-                    <div class="actions-bar">
-                        <button class="btn-download" onclick="downloadPDF()">
-                            <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                            </svg>
-                            <span>Descargar PDF</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="tab-panel" data-panel="1">
-                    <div class="risk-alert-box">
-                        <h3 class="risk-title">Puntos Críticos Detectados</h3>
-                        <p class="risk-description">
-                            Revisa cuidadosamente las siguientes banderas rojas identificadas en el documento:
-                        </p>
-                    </div>
-                    <div class="risk-content" id="riskContent"></div>
-                </div>
-
-                <div class="tab-panel" data-panel="2">
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-info">
-                                <span class="stat-label">Caracteres analizados</span>
-                                <span class="stat-value" id="statChars">-</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-info">
-                            <span class="stat-label">Fecha de análisis</span>
-                            <span class="stat-value" id="statDate">-</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-info">
-                            <span class="stat-label">Estado</span>
-                            <span class="stat-value stat-success">Completado</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                <div class="tab-panel active" id="reportContent"></div>
+                <div class="tab-panel" id="riskContent"></div>
             </div>
         </section>
     </main>
 
-    <footer class="footer">
-        <div class="footer-content">
-            <p class="footer-text">
-                <strong>Privacy Guard</strong> · Tu privacidad es importante ·
-                Los documentos no se almacenan en nuestros servidores
-            </p>
-        </div>
-    </footer>
-
     <script src="js/markdown-parser.js"></script>
     <script src="js/pdf-generator.js"></script>
-    <script src="js/main.js"></script>
-
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
+    
+    <script type="module" src="js/main.js"></script>
 </body>
-
 </html>
