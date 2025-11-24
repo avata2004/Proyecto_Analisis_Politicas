@@ -1,6 +1,6 @@
 /**
- * Privacy Guard - Versión Final (Prompt Limpio + PDF Fix)
- * Modelo: Gemini 2.5 Flash
+ * Privacy Guard - Final Version
+ * Client-Side | Gemini 2.5 Flash | Jina AI Reader
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -22,7 +22,7 @@ const elements = {
     charCount: document.getElementById('charCount'),
     analyzeBtn: document.getElementById('analyzeBtn'),
     
-    // Elementos de UI
+    // UI Elements
     loadingState: document.getElementById('loadingState'),
     loadingText: document.getElementById('loadingText'),
     progressBar: document.getElementById('progressBar'),
@@ -68,22 +68,35 @@ function switchInputMode(mode) {
     }
 }
 
+// --- NUEVA LÓGICA DE URL (USANDO JINA AI) ---
+// Esta es la solución experta para evitar bloqueos de descarga
 async function fetchUrlContent(url) {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    // Jina AI Reader convierte cualquier URL en Markdown limpio para LLMs
+    const readerUrl = `https://r.jina.ai/${url}`;
+    
     try {
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error("Error de red al conectar");
-        const data = await response.json();
-        if (!data || !data.contents) throw new Error("Sitio vacío o bloqueado");
+        const response = await fetch(readerUrl, {
+            headers: {
+                'x-no-cache': 'true' // Forzar lectura fresca
+            }
+        });
+        
+        if (!response.ok) throw new Error("El servicio de lectura no pudo acceder al sitio.");
+        
+        let text = await response.text();
+        
+        // Validación: A veces devuelven errores dentro del texto
+        if (!text || text.length < 100 || text.includes("Jina AI - Access Denied")) {
+            throw new Error("El sitio web tiene protección anti-bot muy estricta.");
+        }
 
-        return data.contents
-            .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, " ")
-            .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, " ")
-            .replace(/<[^>]+>/g, "\n")
-            .replace(/\s+/g, " ")
-            .trim();
+        // Limpieza extra (Jina ya limpia mucho, pero aseguramos)
+        // Quitamos enlaces a imágenes o menús que Jina a veces deja
+        return text.slice(0, 100000); // Límite de seguridad de 100k caracteres
+
     } catch (error) {
-        throw new Error("No se pudo descargar la web. Intenta copiar el texto manualmente.");
+        console.error("Url Error:", error);
+        throw new Error("No se pudo descargar la web automáticamente. Algunos sitios (como Facebook o Bancos) bloquean esto por seguridad. Por favor, copia y pega el texto manualmente.");
     }
 }
 
@@ -94,16 +107,15 @@ async function callGeminiDirect(text, promptContext) {
     const genAI = new GoogleGenerativeAI(API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // === PROMPT AJUSTADO PARA NO DAR SALUDOS ===
+    // PROMPT ESTRICTO (Sin saludos)
     const systemPrompt = `Actúa como CISO. ${promptContext}
     
-    INSTRUCCIONES ESTRICTAS DE SALIDA:
+    INSTRUCCIONES DE SALIDA:
     1. Genera SOLO el reporte en formato MARKDOWN.
-    2. NO incluyas introducciones, saludos, ni texto conversacional al inicio (ej: "Como experto...", "Aquí tienes el reporte").
-    3. NO incluyas conclusiones fuera de la estructura.
-    4. Empieza directamente con el título o el primer encabezado.
+    2. NO incluyas introducciones ni saludos (ej: "Como experto...", "Aquí tienes").
+    3. Empieza directamente con el título o encabezado.
 
-    Estructura requerida:
+    Estructura:
     ## Resumen Ejecutivo
     ## Datos Recolectados
     ## Compartición con Terceros
@@ -127,25 +139,31 @@ async function analyzePrivacy() {
         if (currentInputType === 'url') {
             const url = elements.urlInput.value.trim();
             if (!url.startsWith('http')) { alert('URL inválida'); return; }
-            toggleLoading(true, 0, "Descargando sitio web...");
+            
+            toggleLoading(true, 0, "Conectando con lector inteligente...");
+            // Pequeña barra falsa para UX
+            setTimeout(() => updateProgress(30, "Descargando y limpiando contenido..."), 800);
+            
             textToAnalyze = await fetchUrlContent(url);
+            
             if (textToAnalyze.length < 200) throw new Error("Sitio web vacío.");
+            
         } else {
             textToAnalyze = elements.textarea.value.trim();
         }
 
         if (textToAnalyze.length < 50) return;
 
+        // ESTRATEGIA DE ANÁLISIS
         if (textToAnalyze.length <= CHUNK_SIZE) {
-            toggleLoading(true, 10, "Iniciando análisis...");
-            setTimeout(() => updateProgress(50, "Procesando con IA..."), 500);
-            
+            toggleLoading(true, 50, "Analizando con IA...");
             const markdown = await callGeminiDirect(textToAnalyze, "Analisis Completo");
             
             updateProgress(100, "Finalizando...");
             setTimeout(() => processFinalResult(markdown), 800);
             
         } else {
+            // Secuencial para textos largos
             const chunks = splitTextSafe(textToAnalyze, CHUNK_SIZE);
             const partials = [];
             toggleLoading(true, 0, "Iniciando análisis secuencial...");
@@ -161,8 +179,7 @@ async function analyzePrivacy() {
 
             updateProgress(90, "Unificando reporte final...");
             const combined = partials.join("\n\n");
-            // Prompt específico para fusión
-            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes parciales en uno solo. NO incluyas saludos, empieza directo con el Markdown.");
+            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes. NO incluyas saludos.");
             
             updateProgress(100, "¡Listo!");
             setTimeout(() => processFinalResult(finalReport), 800);
@@ -224,8 +241,7 @@ function splitTextSafe(text, maxLength) {
 }
 
 function processFinalResult(markdown) {
-    // ⚠️ CRUCIAL: Guardar en variable global para que pdf-generator.js funcione
-    window.currentMarkdown = markdown;
+    window.currentMarkdown = markdown; // Para el PDF generator
 
     if(window.parseMarkdown) {
         elements.reportContent.innerHTML = window.parseMarkdown(markdown);
