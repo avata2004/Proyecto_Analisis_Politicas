@@ -1,5 +1,5 @@
 /**
- * Privacy Guard - Versión Client-Side (Sin Backend)
+ * Privacy Guard - Client-Side con Barra de Progreso
  * Modelo: Gemini 2.5 Flash
  */
 
@@ -8,9 +8,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // ==========================================
 // ⚠️ CONFIGURACIÓN: PEGA TU API KEY AQUÍ
 // ==========================================
-const API_KEY = "AIzaSyDGXGGf__tN9B7OZxa99kQJSOeFznwwbNY"; 
+const API_KEY = "AIzaSyDGXGGf__tN9B7OZxa99kQJSOeFznwwbNY..."; 
 
-// Configuración de límites (30k es seguro para el navegador)
 const CHUNK_SIZE = 30000; 
 
 const elements = {
@@ -22,8 +21,13 @@ const elements = {
     urlInputContainer: document.getElementById('urlInputContainer'),
     charCount: document.getElementById('charCount'),
     analyzeBtn: document.getElementById('analyzeBtn'),
+    
+    // Elementos de Loading y Progreso
     loadingState: document.getElementById('loadingState'),
     loadingText: document.getElementById('loadingText'),
+    progressBar: document.getElementById('progressBar'),
+    loadingPercent: document.getElementById('loadingPercent'),
+    
     resultsSection: document.getElementById('resultsSection'),
     reportContent: document.getElementById('reportContent'),
     riskContent: document.getElementById('riskContent'),
@@ -45,7 +49,6 @@ function setupEventListeners() {
     elements.analyzeBtn.addEventListener('click', analyzePrivacy);
     
     if(elements.pdfUpload) elements.pdfUpload.addEventListener('change', handlePdfUpload);
-    
     window.switchTab = switchTab;
 }
 
@@ -66,47 +69,55 @@ function switchInputMode(mode) {
     }
 }
 
-// --- UTILIDAD: Proxy CORS ---
+// --- NUEVA LÓGICA DE URL (Más robusta) ---
 async function fetchUrlContent(url) {
+    // Usamos 'api.allorigins.win' devolviendo JSON para evitar problemas de CORS
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("No se pudo conectar al sitio web");
-    const data = await response.json();
-    if (!data.contents) throw new Error("Sitio vacío o bloqueado");
+    
+    try {
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            throw new Error(`Error de red al conectar con el proxy (${response.status})`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data || !data.contents) {
+            throw new Error("El sitio web no permitió el acceso o está vacío.");
+        }
 
-    return data.contents
-        .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, " ")
-        .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, " ")
-        .replace(/<[^>]+>/g, "\n")
-        .replace(/\s+/g, " ")
-        .trim();
+        // Limpieza de HTML
+        return data.contents
+            .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, " ")
+            .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gim, " ")
+            .replace(/<[^>]+>/g, "\n")
+            .replace(/\s+/g, " ")
+            .trim();
+
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        throw new Error("No se pudo descargar la web. Verifica la URL o intenta copiar y pegar el texto manualmente.");
+    }
 }
 
-// --- LÓGICA DE IA DIRECTA (CLIENT SIDE) ---
+// --- IA DIRECTA ---
 async function callGeminiDirect(text, promptContext) {
-    if (!API_KEY || API_KEY.includes("PEGA_AQUI")) {
-        throw new Error("Falta la API Key en main.js");
-    }
+    if (!API_KEY || API_KEY.includes("PEGA_AQUI")) throw new Error("Falta la API Key");
 
     const genAI = new GoogleGenerativeAI(API_KEY);
-    
-    // === CORRECCIÓN AQUÍ: USAMOS GEMINI 2.5 FLASH ===
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const systemPrompt = `Actúa como Experto CISO. ${promptContext}
-    Analiza el siguiente texto legal.
-    Genera un reporte MARKDOWN bien estructurado.
-    
-    Estructura:
+    Analiza el texto. Genera reporte MARKDOWN estructurado:
     ## Resumen Ejecutivo
     ## Datos Recolectados
     ## Compartición con Terceros
-    ## Banderas Rojas (Riesgos Críticos)
+    ## Banderas Rojas
     ## Retención y Derechos
     ## Recomendaciones`;
 
     const fullPrompt = `${systemPrompt}\n\n--- TEXTO ---\n${text}`;
-
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     return response.text();
@@ -121,35 +132,58 @@ async function analyzePrivacy() {
         if (currentInputType === 'url') {
             const url = elements.urlInput.value.trim();
             if (!url.startsWith('http')) { alert('URL inválida'); return; }
-            toggleLoading(true, "Descargando sitio web...");
+            
+            // Carga inicial indeterminada para la URL
+            toggleLoading(true, 0, "Descargando sitio web...");
+            
             textToAnalyze = await fetchUrlContent(url);
             if (textToAnalyze.length < 200) throw new Error("Sitio web vacío o ilegible.");
+            
         } else {
             textToAnalyze = elements.textarea.value.trim();
         }
 
         if (textToAnalyze.length < 50) return;
 
+        // --- ANÁLISIS ---
         if (textToAnalyze.length <= CHUNK_SIZE) {
-            toggleLoading(true, "Analizando con IA...");
+            // Texto corto: 0% -> 50% -> 100%
+            toggleLoading(true, 10, "Iniciando análisis...");
+            setTimeout(() => updateProgress(50, "Procesando con IA..."), 500);
+            
             const markdown = await callGeminiDirect(textToAnalyze, "Analisis Completo");
-            processFinalResult(markdown);
+            
+            updateProgress(100, "Finalizando...");
+            setTimeout(() => processFinalResult(markdown), 800);
+            
         } else {
+            // Texto largo (Secuencial con Barra de Progreso)
             const chunks = splitTextSafe(textToAnalyze, CHUNK_SIZE);
             const partials = [];
             
+            toggleLoading(true, 0, "Iniciando análisis secuencial...");
+
             for (let i = 0; i < chunks.length; i++) {
-                toggleLoading(true, `Analizando parte ${i+1} de ${chunks.length}...`);
+                // Cálculo de porcentaje: (i / total) * 100
+                // Reservamos el último 10% para la fusión final
+                const progress = Math.round(((i) / chunks.length) * 90);
+                updateProgress(progress, `Analizando sección ${i+1} de ${chunks.length}...`);
+                
                 const context = `(Parte ${i+1} de ${chunks.length}). Extrae puntos clave.`;
                 const res = await callGeminiDirect(chunks[i], context);
                 partials.push(res);
-                await new Promise(r => setTimeout(r, 1000));
+                
+                // Pequeña pausa visual
+                await new Promise(r => setTimeout(r, 500));
             }
 
-            toggleLoading(true, "Unificando reporte final...");
+            // Fase final
+            updateProgress(90, "Unificando reporte final...");
             const combined = partials.join("\n\n");
-            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes parciales en uno solo coherente. Elimina duplicados.");
-            processFinalResult(finalReport);
+            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes parciales en uno solo coherente.");
+            
+            updateProgress(100, "¡Listo!");
+            setTimeout(() => processFinalResult(finalReport), 800);
         }
 
     } catch (error) {
@@ -159,19 +193,25 @@ async function analyzePrivacy() {
     }
 }
 
+// --- UTILIDADES ---
 async function handlePdfUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     try {
-        toggleLoading(true, "Leyendo PDF...");
+        toggleLoading(true, 0, "Leyendo PDF...");
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
         let fullText = "";
+        
         for (let i = 1; i <= pdf.numPages; i++) {
+            const pct = Math.round((i / pdf.numPages) * 100);
+            updateProgress(pct, `Leyendo página ${i} de ${pdf.numPages}...`);
+            
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             fullText += textContent.items.map(item => item.str).join(' ');
         }
+        
         elements.textarea.value = fullText;
         handleTextInput();
         switchInputMode('text');
@@ -212,20 +252,26 @@ function processFinalResult(markdown) {
     } else {
         elements.reportContent.innerText = markdown;
     }
-    
     elements.resultsSection.classList.add('active');
     elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
     toggleLoading(false);
 }
 
-function toggleLoading(show, txt) {
+// Nueva función de control de carga y progreso
+function toggleLoading(show, percent = 0, text = "Cargando...") {
     if(show) {
         elements.loadingState.classList.add('active');
-        if(elements.loadingText) elements.loadingText.textContent = txt;
         elements.resultsSection.classList.remove('active');
+        updateProgress(percent, text);
     } else {
         elements.loadingState.classList.remove('active');
     }
+}
+
+function updateProgress(percent, text) {
+    if(elements.progressBar) elements.progressBar.style.width = `${percent}%`;
+    if(elements.loadingPercent) elements.loadingPercent.textContent = `${percent}%`;
+    if(elements.loadingText && text) elements.loadingText.textContent = text;
 }
 
 function hideResults() { elements.resultsSection.classList.remove('active'); }

@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Guard - Análisis de Privacidad</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 
     <script type="importmap">
@@ -22,6 +25,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 </head>
+
 <body>
     <header class="header">
         <div class="header-content">
@@ -32,9 +36,14 @@
 
     <main class="main-container">
         <section class="input-section">
-            <div class="mode-selector" style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
-                <button id="modeText" class="mode-btn active-mode" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄 Texto / PDF</button>
-                <button id="modeUrl" class="mode-btn" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">🔗 Enlace Web</button>
+            <div class="mode-selector"
+                style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+                <button id="modeText" class="mode-btn active-mode"
+                    style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄
+                    Texto / PDF</button>
+                <button id="modeUrl" class="mode-btn"
+                    style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">🔗
+                    Enlace Web</button>
             </div>
 
             <div class="input-container">
@@ -42,10 +51,13 @@
                     <div class="input-header">
                         <label class="input-label">Texto o Archivo PDF</label>
                         <input type="file" id="pdfUpload" accept=".pdf" hidden>
-                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">📂 Subir PDF</button>
+                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">📂 Subir
+                            PDF</button>
                     </div>
-                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí..." rows="10"></textarea>
-                    <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span></div>
+                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto aquí..."
+                        rows="10"></textarea>
+                    <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span>
+                    </div>
                 </div>
 
                 <div id="urlInputContainer" style="display: none;">
@@ -59,7 +71,14 @@
 
         <div id="loadingState" class="loading-state">
             <div class="loader"></div>
-            <p class="loading-text" id="loadingText">Procesando...</p>
+
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+
+            <p class="loading-text">
+                <span id="loadingPercent">0%</span> - <span id="loadingText">Iniciando...</span>
+            </p>
         </div>
 
         <section id="resultsSection" class="results-section">
@@ -76,7 +95,8 @@
 
     <script src="js/markdown-parser.js"></script>
     <script src="js/pdf-generator.js"></script>
-    
+
     <script type="module" src="js/main.js"></script>
 </body>
+
 </html>

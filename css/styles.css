@@ -696,3 +696,37 @@ body {
     border-bottom-color: var(--color-primary) !important;
 }
 .mode-btn { color: #64748b; }
+
+
+.progress-container {
+    width: 100%;
+    background-color: #e2e8f0; /* Gris claro */
+    border-radius: 10px;
+    height: 12px;
+    margin-top: 1rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: var(--color-primary); /* Azul */
+    width: 0%; /* Inicia en 0 */
+    border-radius: 10px;
+    transition: width 0.5s ease-in-out;
+    background-image: linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent);
+    background-size: 1rem 1rem;
+    animation: progress-stripes 1s linear infinite;
+}
+
+@keyframes progress-stripes {
+    0% { background-position: 1rem 0; }
+    100% { background-position: 0 0; }
+}
+
+.loading-text {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
