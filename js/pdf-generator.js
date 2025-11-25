@@ -112,16 +112,25 @@ function renderPDFHeader(doc, config) {
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, config.pageWidth, 45, 'F');
 
+    // Icono Escudo Blanco (Base64)
+    const shieldIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRaPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNMTIgMjJzOC00IDgtMTBWNWwtOC0zLTggM3Y3YzAgNiA4IDEwIDggMTB6Ii8+PC9zdmc+";
+    
+    const centerX = config.pageWidth / 2;
+    const iconSize = 10;
+    // Ajustamos posición para centrar el conjunto icono + texto
+    doc.addImage(shieldIcon, 'SVG', centerX - 45, 14, iconSize, iconSize);
+
     // Título principal
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(26);
     doc.setFont(undefined, 'bold');
-    doc.text('Privacy Guard', config.pageWidth / 2, 20, { align: 'center' });
+    // Desplazamos el texto un poco a la derecha para dejar espacio al icono
+    doc.text('Privacy Guard', centerX - 30, 23);
 
     // Subtítulo
     doc.setFontSize(12);
     doc.setFont(undefined, 'normal');
-    doc.text('Análisis de Política de Privacidad', config.pageWidth / 2, 32, { align: 'center' });
+    doc.text('Análisis de Política de Privacidad', centerX, 32, { align: 'center' });
 
     // Línea decorativa
     doc.setDrawColor(59, 130, 246);
