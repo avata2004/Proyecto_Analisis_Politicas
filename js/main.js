@@ -26,7 +26,6 @@ const elements = {
     pdfUpload: document.getElementById('pdfUpload'),
     riskGaugeContainer: document.getElementById('riskGaugeContainer'),
     riskIndicator: document.getElementById('riskIndicator'),
-    riskIcon: document.getElementById('riskIcon'),
     riskLabel: document.getElementById('riskLabel'),
     riskSummary: document.getElementById('riskSummary')
 };
@@ -281,7 +280,6 @@ function calculateRisk(markdown) {
 // --- ACTUALIZACIÓN DEL SEMÁFORO ---
 function updateRiskGauge(riskLevel) {
     const container = elements.riskGaugeContainer;
-    const icon = elements.riskIcon;
     const label = elements.riskLabel;
     const summary = elements.riskSummary;
 
@@ -290,19 +288,16 @@ function updateRiskGauge(riskLevel) {
     switch(riskLevel) {
         case 'low':
             container.classList.add('risk-low');
-            icon.textContent = '🟢';
             label.textContent = 'Riesgo Bajo / Estándar';
             summary.textContent = 'Contiene términos comunes en la industria con un nivel de exposición aceptable.';
             break;
         case 'medium':
             container.classList.add('risk-medium');
-            icon.textContent = '🟡';
             label.textContent = 'Riesgo Medio';
             summary.textContent = 'Se detectaron varias cláusulas que requieren precaución por parte del usuario.';
             break;
         case 'high':
             container.classList.add('risk-high');
-            icon.textContent = '🔴';
             label.textContent = 'Alto Riesgo';
             summary.textContent = 'La política contiene múltiples cláusulas agresivas o intrusivas. Se recomienda cautela extrema.';
             break;
@@ -346,7 +341,6 @@ function updateProgress(percent, text) {
 function hideResults() {
     elements.resultsSection.classList.remove('active');
     elements.riskGaugeContainer.classList.remove('risk-low', 'risk-medium', 'risk-high');
-    elements.riskIcon.textContent = '🟢';
     elements.riskLabel.textContent = 'Analizando...';
     elements.riskSummary.textContent = '';
 }
