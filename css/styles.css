@@ -304,24 +304,80 @@ body {
     display: block;
 }
 
-.alert-success {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md);
-    background: #d1fae5;
-    border: 1px solid #34d399;
-    border-radius: 12px;
-    color: #065f46;
-    font-weight: 500;
+/* ============================================
+   RISK GAUGE (SEMÁFORO) - NUEVO
+   ============================================ */
+.risk-gauge-container {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
 }
 
-.alert-icon {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
+.gauge-header {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--spacing-md);
 }
+
+.gauge-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.risk-indicator {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    background-color: var(--color-border); /* Color por defecto */
+    transition: var(--transition);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.risk-label {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text);
+    transition: var(--transition);
+}
+
+.risk-summary {
+    color: var(--color-text-secondary);
+    font-size: 0.938rem;
+    transition: var(--transition);
+}
+
+/* Colores del Semáforo según el estado */
+.risk-gauge-container.risk-low .risk-indicator {
+    background-color: var(--color-success); /* Verde */
+    box-shadow: 0 0 15px var(--color-success);
+}
+.risk-gauge-container.risk-low .risk-label { color: var(--color-success); }
+
+.risk-gauge-container.risk-medium .risk-indicator {
+    background-color: var(--color-warning); /* Amarillo */
+    box-shadow: 0 0 15px var(--color-warning);
+}
+.risk-gauge-container.risk-medium .risk-label { color: var(--color-warning); }
+
+.risk-gauge-container.risk-high .risk-indicator {
+    background-color: var(--color-danger); /* Rojo */
+    box-shadow: 0 0 15px var(--color-danger);
+}
+.risk-gauge-container.risk-high .risk-label { color: var(--color-danger); }
 
 /* ============================================
    TABS NAVIGATION

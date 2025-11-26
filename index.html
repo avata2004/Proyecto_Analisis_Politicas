@@ -91,6 +91,17 @@
         </div>
 
         <section id="resultsSection" class="results-section">
+            <div id="riskGaugeContainer" class="risk-gauge-container">
+                <div class="gauge-header">Nivel de Riesgo Detectado</div>
+                <div class="gauge-body">
+                    <div id="riskIndicator" class="risk-indicator">
+                        <span id="riskIcon">🟢</span>
+                    </div>
+                    <div id="riskLabel" class="risk-label">Bajo Riesgo</div>
+                </div>
+                <p id="riskSummary" class="risk-summary">Calculando nivel de riesgo...</p>
+            </div>
+
             <nav class="tabs-nav">
                 <button class="tab-btn active" onclick="switchTab(0)">📊 Reporte</button>
                 <button class="tab-btn" onclick="switchTab(1)">⚠️ Riesgos</button>

@@ -23,7 +23,13 @@ const elements = {
     resultsSection: document.getElementById('resultsSection'),
     reportContent: document.getElementById('reportContent'),
     riskContent: document.getElementById('riskContent'),
-    pdfUpload: document.getElementById('pdfUpload')
+    pdfUpload: document.getElementById('pdfUpload'),
+    // Nuevos elementos del semáforo
+    riskGaugeContainer: document.getElementById('riskGaugeContainer'),
+    riskIndicator: document.getElementById('riskIndicator'),
+    riskIcon: document.getElementById('riskIcon'),
+    riskLabel: document.getElementById('riskLabel'),
+    riskSummary: document.getElementById('riskSummary')
 };
 
 let currentInputType = 'text';
@@ -111,29 +117,27 @@ async function callGeminiDirect(text, promptContext) {
     NO transcribas el texto original. Solo extrae los puntos clave.
     
     INSTRUCCIONES DE SALIDA:
-    1. Usa listas con viñetas (bullets) cortas.
-    2. Máximo 5 oraciones por sección narrativa.
-    3. Ve directo al grano.
-    4. Empieza directo con el título.
+    1. Usa listas con viñetas (bullets) cortas para TODO.
+    2. Sé directo y claro.
 
     Estructura OBLIGATORIA:
     ## Resumen Ejecutivo
-    (Máximo 5 líneas resumiendo el nivel general de riesgo).
+    (Máximo 3 puntos clave sobre el riesgo general).
 
     ## Datos Recolectados
-    (Lista breve y agrupada de los datos más importantes/sensibles que se llevan).
+    (Lista breve de datos sensibles).
 
     ## Compartición con Terceros
-    (Resumen muy breve de a quién le dan los datos).
+    (Lista breve de quién recibe datos).
 
     ## Banderas Rojas
-    (Solo menciona las cláusulas realmente peligrosas o abusivas. Sé directo).
+    (Lista de las cláusulas más peligrosas).
 
     ## Retención y Derechos
-    (Brevemente: cuánto tiempo guardan los datos y cómo borrarlos).
+    (Lista breve sobre tiempos y cómo borrar).
 
     ## Recomendaciones para el Usuario
-    (3 acciones breves y prácticas que el usuario debe tomar para protegerse. Ejemplo: "Usa un correo secundario", "Deniega acceso a contactos").`;
+    (3 acciones prácticas que el usuario debe tomar).`;
 
     const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
 
@@ -260,8 +264,65 @@ function splitTextSafe(text, maxLength) {
     return chunks;
 }
 
+// --- NUEVA FUNCIÓN PARA CALCULAR EL RIESGO ---
+function calculateRisk(markdown) {
+    // 1. Extraer la sección de banderas rojas
+    const riskSectionMatch = markdown.match(/## Banderas Rojas\s+([\s\S]*?)(?=## |$)/i);
+    if (!riskSectionMatch || !riskSectionMatch[1]) return 'low';
+
+    const riskContent = riskSectionMatch[1].trim();
+    
+    // 2. Contar los bullets (* o -) que indican una bandera
+    const redFlagsCount = riskContent.split('\n')
+        .filter(line => /^\s*[-*]\s+/.test(line))
+        .length;
+
+    // 3. Determinar nivel
+    if (redFlagsCount === 0) return 'low';
+    if (redFlagsCount <= 3) return 'medium';
+    return 'high';
+}
+
+// --- NUEVA FUNCIÓN PARA ACTUALIZAR EL SEMÁFORO ---
+function updateRiskGauge(riskLevel) {
+    const container = elements.riskGaugeContainer;
+    const icon = elements.riskIcon;
+    const label = elements.riskLabel;
+    const summary = elements.riskSummary;
+
+    // Reset classes
+    container.classList.remove('risk-low', 'risk-medium', 'risk-high');
+
+    switch(riskLevel) {
+        case 'low':
+            container.classList.add('risk-low');
+            icon.textContent = '🟢';
+            label.textContent = 'Bajo Riesgo';
+            summary.textContent = 'Parece ser una política estándar con pocas cláusulas preocupantes.';
+            break;
+        case 'medium':
+            container.classList.add('risk-medium');
+            icon.textContent = '🟡';
+            label.textContent = 'Riesgo Medio';
+            summary.textContent = 'Se detectaron algunas cláusulas que requieren tu atención.';
+            break;
+        case 'high':
+            container.classList.add('risk-high');
+            icon.textContent = '🔴';
+            label.textContent = 'Alto Riesgo';
+            summary.textContent = 'Contiene múltiples cláusulas que podrían comprometer tu privacidad.';
+            break;
+    }
+}
+
 function processFinalResult(markdown) {
     window.currentMarkdown = markdown;
+    
+    // --- NUEVO: Calcular y mostrar riesgo en el semáforo ---
+    const riskLevel = calculateRisk(markdown);
+    updateRiskGauge(riskLevel);
+    // -------------------------------------------------------
+
     if (window.parseMarkdown) {
         elements.reportContent.innerHTML = window.parseMarkdown(markdown);
         const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
@@ -290,7 +351,14 @@ function updateProgress(percent, text) {
     if (elements.loadingText && text) elements.loadingText.textContent = text;
 }
 
-function hideResults() { elements.resultsSection.classList.remove('active'); }
+function hideResults() {
+    elements.resultsSection.classList.remove('active');
+    // Reset del semáforo al ocultar resultados
+    elements.riskGaugeContainer.classList.remove('risk-low', 'risk-medium', 'risk-high');
+    elements.riskIcon.textContent = '🟢';
+    elements.riskLabel.textContent = 'Analizando...';
+    elements.riskSummary.textContent = '';
+}
 
 function switchTab(index) {
     document.querySelectorAll('.tab-btn').forEach((btn, i) => {
