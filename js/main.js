@@ -271,10 +271,10 @@ function calculateRisk(markdown) {
     // 0-1: Bajo (Normal, siempre hay algo mínimo)
     if (redFlagsCount <= 1) return 'low';
     
-    // 2-4: Medio (Hay cosas que vigilar)
-    if (redFlagsCount <= 4) return 'medium';
+    // 2-3: Medio (Hay cosas que vigilar)
+    if (redFlagsCount <= 3) return 'medium';
     
-    // 5+: Alto (Peligroso)
+    // 4+: Alto (Peligroso)
     return 'high';
 }
 
