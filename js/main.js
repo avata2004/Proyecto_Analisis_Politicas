@@ -130,7 +130,7 @@ async function callGeminiDirect(text, promptContext) {
     ## Retención y Derechos
     (Brevemente).
 
-    ## Recomendaciones para el Usuario
+    ## Recomendaciones para el Usuario respecto al texto proporcionado
     (3 acciones prácticas).`;
 
     const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
