@@ -194,7 +194,7 @@ async function analyzePrivacy() {
                 await new Promise(r => setTimeout(r, 500));
             }
 
-            updateProgress(90, "Unificando reporte final...");
+            updateProgress(90, "Creando reporte final...");
             const combined = partials.join("\n\n");
             const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes en un RESUMEN FINAL MUY CORTO Y CONCISO. Elimina todo lo repetitivo.");
             updateProgress(100, "¡Listo!");
