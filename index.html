@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Guard - Análisis de Privacidad</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 
     <script type="importmap">
@@ -22,6 +25,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 </head>
+
 <body>
     <header class="header">
         <div class="header-content">
@@ -30,19 +34,25 @@
     </header>
 
     <main class="main-container">
-        
+
         <section class="intro-section" style="text-align: center; margin-bottom: 2rem;">
             <h2 class="section-title">Entiende lo que aceptas antes de firmar</h2>
             <p class="section-description">
-                Sube un contrato PDF, pega el texto o ingresa un enlace web. 
-                Nuestra IA analizará las letras pequeñas para detectar <strong>riesgos, cláusulas abusivas y uso de tus datos.</strong>
+                Sube un contrato PDF, pega el texto o ingresa un enlace web.
+                Nuestra IA analizará las letras pequeñas para detectar <strong>riesgos, cláusulas abusivas y uso de tus
+                    datos.</strong>
             </p>
         </section>
 
         <section class="input-section">
-            <div class="mode-selector" style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
-                <button id="modeText" class="mode-btn active-mode" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄 Texto / PDF</button>
-                <button id="modeUrl" class="mode-btn" style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">🔗 Enlace Web</button>
+            <div class="mode-selector"
+                style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+                <button id="modeText" class="mode-btn active-mode"
+                    style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">📄
+                    Texto / PDF</button>
+                <button id="modeUrl" class="mode-btn"
+                    style="padding: 0.5rem 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">🔗
+                    Enlace Web</button>
             </div>
 
             <div class="input-container">
@@ -50,16 +60,20 @@
                     <div class="input-header">
                         <label class="input-label">Texto o Archivo PDF</label>
                         <input type="file" id="pdfUpload" accept=".pdf" hidden>
-                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">Subir PDF</button>
+                        <button class="btn-secondary" onclick="document.getElementById('pdfUpload').click()">Subir
+                            PDF</button>
                     </div>
-                    <textarea id="privacyText" class="text-input" placeholder="Pega el texto de los términos y condiciones aquí..." rows="10"></textarea>
-                    <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span></div>
+                    <textarea id="privacyText" class="text-input"
+                        placeholder="Pega el texto de los términos y condiciones aquí..." rows="10"></textarea>
+                    <div class="input-footer"><span class="char-counter"><span id="charCount">0</span> caracteres</span>
+                    </div>
                 </div>
 
                 <div id="urlInputContainer" style="display: none;">
                     <label class="input-label">Dirección del sitio web</label>
                     <input type="url" id="urlInput" class="text-input" placeholder="https://ejemplo.com/privacidad">
-                    <p class="input-hint" style="margin-top: 0.5rem; font-size: 0.85rem; color: #64748b;">Analizaremos el contenido público de la página.</p>
+                    <p class="input-hint" style="margin-top: 0.5rem; font-size: 0.85rem; color: #64748b;">Analizaremos
+                        el contenido público de la página.</p>
                 </div>
             </div>
 
@@ -84,11 +98,11 @@
             <div class="tabs-content">
                 <div class="tab-panel active">
                     <div id="reportContent" class="report-content"></div>
-                    
+
                     <div class="actions-bar">
                         <button class="btn-download" onclick="downloadPDF()">
                             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
                             </svg>
                             <span>Descargar Reporte PDF</span>
                         </button>
@@ -103,7 +117,7 @@
     <footer class="footer">
         <div class="footer-content">
             <p class="footer-text">
-                <strong>Privacy Guard</strong> · Tu privacidad es importante · 
+                <strong>Privacy Guard</strong> · Tu privacidad es importante ·
                 Los documentos no se almacenan en nuestros servidores
             </p>
         </div>
@@ -111,7 +125,8 @@
 
     <script src="js/markdown-parser.js"></script>
     <script src="js/pdf-generator.js"></script>
-    
+
     <script type="module" src="js/main.js"></script>
 </body>
+
 </html>

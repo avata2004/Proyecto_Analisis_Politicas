@@ -104,27 +104,60 @@ async function callGeminiDirect(text, promptContext) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const systemPrompt = `Actúa como CISO asesorando a un USUARIO COMÚN. ${promptContext}
+    // === PROMPT OPTIMIZADO PARA BREVEDAD ===
+    const systemPrompt = `Actúa como CISO asesorando a un USUARIO COMUN. ${promptContext}
+    
+    OBJETIVO: Generar un reporte EXTREMADAMENTE CONCISO y resumido.
+    NO transcribas el texto original. Solo extrae los puntos clave.
     
     INSTRUCCIONES DE SALIDA:
-    1. Genera SOLO el reporte en formato MARKDOWN.
-    2. NO incluyas introducciones ni saludos.
-    3. Empieza directamente con el título.
+    1. Usa listas con viñetas (bullets) cortas.
+    2. Máximo 5 oraciones por sección narrativa.
+    3. Ve directo al grano.
+    4. Empieza directo con el título.
 
-    Estructura:
+    Estructura OBLIGATORIA:
     ## Resumen Ejecutivo
+    (Máximo 5 líneas resumiendo el nivel general de riesgo).
+
     ## Datos Recolectados
+    (Lista breve y agrupada de los datos más importantes/sensibles que se llevan).
+
     ## Compartición con Terceros
+    (Resumen muy breve de a quién le dan los datos).
+
     ## Banderas Rojas
+    (Solo menciona las cláusulas realmente peligrosas o abusivas. Sé directo).
+
     ## Retención y Derechos
+    (Brevemente: cuánto tiempo guardan los datos y cómo borrarlos).
+
     ## Recomendaciones para el Usuario
-    (IMPORTANTE: Escribe 3 consejos prácticos dirigidos al usuario sobre qué debe hacer para protegerse. NO des consejos a la empresa sobre cómo mejorar su aviso. Ejemplos correctos: "Evita subir documentos sensibles...", "Configura tu navegador para...", "Solicita la baja si...").`;
+    (3 acciones breves y prácticas que el usuario debe tomar para protegerse. Ejemplo: "Usa un correo secundario", "Deniega acceso a contactos").`;
 
     const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
 
-    const result = await model.generateContent(fullPrompt);
-    const response = await result.response;
-    return response.text();
+    // INTENTOS (RETRY LOGIC)
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const result = await model.generateContent(fullPrompt);
+            const response = await result.response;
+            return response.text();
+        } catch (error) {
+            console.warn(`Intento ${attempt} fallido:`, error.message);
+            lastError = error;
+            
+            if (error.message.includes("503") || error.message.includes("overloaded")) {
+                if (attempt < 3) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    continue;
+                }
+            }
+            throw error;
+        }
+    }
+    throw new Error("El servidor de Google está muy saturado. Intenta de nuevo en 1 minuto.");
 }
 
 // --- FLUJO PRINCIPAL ---
@@ -159,7 +192,7 @@ async function analyzePrivacy() {
             for (let i = 0; i < chunks.length; i++) {
                 const progress = Math.round(((i) / chunks.length) * 90);
                 updateProgress(progress, `Analizando sección ${i + 1} de ${chunks.length}...`);
-                const context = `(Parte ${i + 1} de ${chunks.length}). Extrae puntos clave.`;
+                const context = `(Parte ${i + 1} de ${chunks.length}). Extrae SOLO puntos clave muy resumidos.`;
                 const res = await callGeminiDirect(chunks[i], context);
                 partials.push(res);
                 await new Promise(r => setTimeout(r, 500));
@@ -167,7 +200,7 @@ async function analyzePrivacy() {
 
             updateProgress(90, "Unificando reporte final...");
             const combined = partials.join("\n\n");
-            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes. NO incluyas saludos.");
+            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes en un RESUMEN FINAL MUY CORTO Y CONCISO. Elimina todo lo repetitivo.");
             updateProgress(100, "¡Listo!");
             setTimeout(() => processFinalResult(finalReport), 800);
         }
