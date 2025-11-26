@@ -24,7 +24,6 @@ const elements = {
     reportContent: document.getElementById('reportContent'),
     riskContent: document.getElementById('riskContent'),
     pdfUpload: document.getElementById('pdfUpload'),
-    // Nuevos elementos del semáforo
     riskGaugeContainer: document.getElementById('riskGaugeContainer'),
     riskIndicator: document.getElementById('riskIndicator'),
     riskIcon: document.getElementById('riskIcon'),
@@ -33,7 +32,6 @@ const elements = {
 };
 
 let currentInputType = 'text';
-// Variable para guardar la key temporalmente
 let CACHED_API_KEY = null;
 
 function init() {
@@ -104,44 +102,40 @@ async function fetchUrlContent(url) {
 
 // --- IA DIRECTA ---
 async function callGeminiDirect(text, promptContext) {
-    // 1. Obtenemos la clave de forma segura antes de llamar a Google
     const apiKey = await getApiKey();
-
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // === PROMPT OPTIMIZADO PARA BREVEDAD ===
     const systemPrompt = `Actúa como CISO asesorando a un USUARIO COMUN. ${promptContext}
     
     OBJETIVO: Generar un reporte EXTREMADAMENTE CONCISO y resumido.
-    NO transcribas el texto original. Solo extrae los puntos clave.
     
     INSTRUCCIONES DE SALIDA:
-    1. Usa listas con viñetas (bullets) cortas para TODO.
-    2. Sé directo y claro.
+    1. Usa listas con viñetas (bullets) cortas.
+    2. Sé directo.
+    3. Empieza directo con el título.
 
     Estructura OBLIGATORIA:
     ## Resumen Ejecutivo
-    (Máximo 3 puntos clave sobre el riesgo general).
+    (Máximo 5 líneas).
 
     ## Datos Recolectados
-    (Lista breve de datos sensibles).
+    (Lista breve).
 
     ## Compartición con Terceros
-    (Lista breve de quién recibe datos).
+    (Resumen breve).
 
     ## Banderas Rojas
-    (Lista de las cláusulas más peligrosas).
+    (Solo menciona las cláusulas realmente peligrosas).
 
     ## Retención y Derechos
-    (Lista breve sobre tiempos y cómo borrar).
+    (Brevemente).
 
     ## Recomendaciones para el Usuario
-    (3 acciones prácticas que el usuario debe tomar).`;
+    (3 acciones prácticas).`;
 
     const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
 
-    // INTENTOS (RETRY LOGIC)
     let lastError = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
         try {
@@ -151,7 +145,6 @@ async function callGeminiDirect(text, promptContext) {
         } catch (error) {
             console.warn(`Intento ${attempt} fallido:`, error.message);
             lastError = error;
-            
             if (error.message.includes("503") || error.message.includes("overloaded")) {
                 if (attempt < 3) {
                     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -264,53 +257,54 @@ function splitTextSafe(text, maxLength) {
     return chunks;
 }
 
-// --- NUEVA FUNCIÓN PARA CALCULAR EL RIESGO ---
+// --- CÁLCULO DE RIESGO REALISTA ---
 function calculateRisk(markdown) {
-    // 1. Extraer la sección de banderas rojas
     const riskSectionMatch = markdown.match(/## Banderas Rojas\s+([\s\S]*?)(?=## |$)/i);
-    if (!riskSectionMatch || !riskSectionMatch[1]) return 'low';
+    if (!riskSectionMatch || !riskSectionMatch[1]) return 'low'; // Si no encuentra sección, asume bajo por defecto
 
     const riskContent = riskSectionMatch[1].trim();
-    
-    // 2. Contar los bullets (* o -) que indican una bandera
     const redFlagsCount = riskContent.split('\n')
         .filter(line => /^\s*[-*]\s+/.test(line))
         .length;
 
-    // 3. Determinar nivel
-    if (redFlagsCount === 0) return 'low';
-    if (redFlagsCount <= 3) return 'medium';
+    // Lógica "Realista":
+    // 0-1: Bajo (Normal, siempre hay algo mínimo)
+    if (redFlagsCount <= 1) return 'low';
+    
+    // 2-4: Medio (Hay cosas que vigilar)
+    if (redFlagsCount <= 4) return 'medium';
+    
+    // 5+: Alto (Peligroso)
     return 'high';
 }
 
-// --- NUEVA FUNCIÓN PARA ACTUALIZAR EL SEMÁFORO ---
+// --- ACTUALIZACIÓN DEL SEMÁFORO ---
 function updateRiskGauge(riskLevel) {
     const container = elements.riskGaugeContainer;
     const icon = elements.riskIcon;
     const label = elements.riskLabel;
     const summary = elements.riskSummary;
 
-    // Reset classes
     container.classList.remove('risk-low', 'risk-medium', 'risk-high');
 
     switch(riskLevel) {
         case 'low':
             container.classList.add('risk-low');
             icon.textContent = '🟢';
-            label.textContent = 'Bajo Riesgo';
-            summary.textContent = 'Parece ser una política estándar con pocas cláusulas preocupantes.';
+            label.textContent = 'Riesgo Bajo / Estándar';
+            summary.textContent = 'Contiene términos comunes en la industria con un nivel de exposición aceptable.';
             break;
         case 'medium':
             container.classList.add('risk-medium');
             icon.textContent = '🟡';
             label.textContent = 'Riesgo Medio';
-            summary.textContent = 'Se detectaron algunas cláusulas que requieren tu atención.';
+            summary.textContent = 'Se detectaron varias cláusulas que requieren precaución por parte del usuario.';
             break;
         case 'high':
             container.classList.add('risk-high');
             icon.textContent = '🔴';
             label.textContent = 'Alto Riesgo';
-            summary.textContent = 'Contiene múltiples cláusulas que podrían comprometer tu privacidad.';
+            summary.textContent = 'La política contiene múltiples cláusulas agresivas o intrusivas. Se recomienda cautela extrema.';
             break;
     }
 }
@@ -318,15 +312,13 @@ function updateRiskGauge(riskLevel) {
 function processFinalResult(markdown) {
     window.currentMarkdown = markdown;
     
-    // --- NUEVO: Calcular y mostrar riesgo en el semáforo ---
     const riskLevel = calculateRisk(markdown);
     updateRiskGauge(riskLevel);
-    // -------------------------------------------------------
 
     if (window.parseMarkdown) {
         elements.reportContent.innerHTML = window.parseMarkdown(markdown);
         const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
-        elements.riskContent.innerHTML = risks ? window.parseMarkdown(risks[0]) : "✅ Sin riesgos críticos.";
+        elements.riskContent.innerHTML = risks ? window.parseMarkdown(risks[0]) : "✅ Sin riesgos críticos detectados.";
     } else {
         elements.reportContent.innerText = markdown;
     }
@@ -353,7 +345,6 @@ function updateProgress(percent, text) {
 
 function hideResults() {
     elements.resultsSection.classList.remove('active');
-    // Reset del semáforo al ocultar resultados
     elements.riskGaugeContainer.classList.remove('risk-low', 'risk-medium', 'risk-high');
     elements.riskIcon.textContent = '🟢';
     elements.riskLabel.textContent = 'Analizando...';
