@@ -1,11 +1,9 @@
 /**
- * Privacy Guard - Secure Client-Side
+ * Privacy Guard 
  * Modelo: Gemini 2.5 Flash
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const CHUNK_SIZE = 30000;
 
 const elements = {
     textarea: document.getElementById('privacyText'),
@@ -80,7 +78,7 @@ async function getApiKey() {
         return CACHED_API_KEY;
     } catch (error) {
         console.error("Auth Error:", error);
-        throw new Error("Error de autenticación. Verifica las variables de entorno en Netlify.");
+        throw new Error("Error de autenticación. Verifica las variables de entorno.");
     }
 }
 
@@ -93,22 +91,23 @@ async function fetchUrlContent(url) {
         if (!text || text.length < 100 || text.includes("Jina AI - Access Denied")) {
             throw new Error("El sitio web tiene protección anti-bot muy estricta.");
         }
-        return text.slice(0, 100000);
+        return text; // Ya no recortamos artificialmente
     } catch (error) {
         throw new Error("No se pudo descargar la web automáticamente.");
     }
 }
 
 // --- IA DIRECTA ---
-async function callGeminiDirect(text, promptContext) {
+async function callGeminiDirect(text) {
     const apiKey = await getApiKey();
     const genAI = new GoogleGenerativeAI(apiKey);
+    // Usamos el modelo Flash que tiene ventana de contexto masiva (1M tokens)
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const systemPrompt = `Actúa como CISO asesorando a un USUARIO COMUN. ${promptContext}
+    const systemPrompt = `Actúa como experto legal y CISO asesorando a un USUARIO COMUN.
     
     OBJETIVO: Generar un reporte EXTREMADAMENTE CONCISO y resumido.
-    
+
     INSTRUCCIONES DE SALIDA:
     1. Usa listas con viñetas (bullets) cortas.
     2. Sé directo.
@@ -125,81 +124,64 @@ async function callGeminiDirect(text, promptContext) {
     (Resumen breve).
 
     ## Banderas Rojas
-    (Solo menciona las cláusulas realmente peligrosas).
-
+    (CRÍTICO: Usa una lista de viñetas ("- ") para cada riesgo detectado. Si no hay riesgos graves, escribe "Ninguno". Solo menciona cláusulas realmente abusivas o peligrosas, citando textualmente si es necesario).    
+    
     ## Retención y Derechos
     (Brevemente).
 
     ## Recomendaciones para el Usuario
     (3 acciones prácticas respecto al texto que el usuario proporcionó).`;
 
-    const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
-
-    let lastError = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-            const result = await model.generateContent(fullPrompt);
-            const response = await result.response;
-            return response.text();
-        } catch (error) {
-            console.warn(`Intento ${attempt} fallido:`, error.message);
-            lastError = error;
-            if (error.message.includes("503") || error.message.includes("overloaded")) {
-                if (attempt < 3) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    continue;
-                }
-            }
-            throw error;
-        }
+    try {
+        const result = await model.generateContent(fullPrompt);
+        const response = await result.response;
+        return response.text();
+    } catch (error) {
+        console.error("Gemini Error:", error);
+        if (error.message.includes("429")) throw new Error("Límite de cuota excedido. Intenta en unos minutos.");
+        if (error.message.includes("503")) throw new Error("Servidores de Google saturados.");
+        throw error;
     }
-    throw new Error("El servidor de Google está muy saturado. Intenta de nuevo en 1 minuto.");
 }
 
-// --- FLUJO PRINCIPAL ---
+// --- FLUJO PRINCIPAL OPTIMIZADO ---
 async function analyzePrivacy() {
     hideResults();
     let textToAnalyze = "";
 
     try {
+        // 1. Obtención del Texto
         if (currentInputType === 'url') {
             const url = elements.urlInput.value.trim();
             if (!url.startsWith('http')) { alert('URL inválida'); return; }
-            toggleLoading(true, 0, "Conectando con lector inteligente...");
-            setTimeout(() => updateProgress(30, "Descargando y limpiando contenido..."), 800);
+
+            toggleLoading(true, 10, "Conectando con lector inteligente...");
+            // Pequeño delay visual
+            setTimeout(() => updateProgress(30, "Descargando contenido completo..."), 500);
+
             textToAnalyze = await fetchUrlContent(url);
-            if (textToAnalyze.length < 200) throw new Error("Sitio web vacío.");
+
+            if (!textToAnalyze || textToAnalyze.length < 200) throw new Error("Sitio web vacío o inaccesible.");
         } else {
             textToAnalyze = elements.textarea.value.trim();
         }
 
-        if (textToAnalyze.length < 50) return;
-
-        if (textToAnalyze.length <= CHUNK_SIZE) {
-            toggleLoading(true, 50, "Analizando con IA...");
-            const markdown = await callGeminiDirect(textToAnalyze, "Analisis Completo");
-            updateProgress(100, "Finalizando...");
-            setTimeout(() => processFinalResult(markdown), 800);
-        } else {
-            const chunks = splitTextSafe(textToAnalyze, CHUNK_SIZE);
-            const partials = [];
-            toggleLoading(true, 0, "Iniciando análisis secuencial...");
-
-            for (let i = 0; i < chunks.length; i++) {
-                const progress = Math.round(((i) / chunks.length) * 90);
-                updateProgress(progress, `Analizando sección ${i + 1} de ${chunks.length}...`);
-                const context = `(Parte ${i + 1} de ${chunks.length}). Extrae SOLO puntos clave muy resumidos.`;
-                const res = await callGeminiDirect(chunks[i], context);
-                partials.push(res);
-                await new Promise(r => setTimeout(r, 500));
-            }
-
-            updateProgress(90, "Creando reporte final...");
-            const combined = partials.join("\n\n");
-            const finalReport = await callGeminiDirect(combined, "Fusiona estos reportes en un RESUMEN FINAL MUY CORTO Y CONCISO. Elimina todo lo repetitivo.");
-            updateProgress(100, "¡Listo!");
-            setTimeout(() => processFinalResult(finalReport), 800);
+        if (textToAnalyze.length < 50) {
+            alert("El texto es muy corto para analizar.");
+            toggleLoading(false);
+            return;
         }
+
+        // 2. Análisis en una sola pasada
+        // Enviamos todo el texto de golpe. Gemini Flash soporta ~700,000 palabras.
+        // Tu límite de 100k caracteres es juego de niños para este modelo.
+
+        toggleLoading(true, 50, "Analizando legalmente todo el documento...");
+
+        const markdown = await callGeminiDirect(textToAnalyze);
+
+        updateProgress(100, "Generando reporte...");
+        setTimeout(() => processFinalResult(markdown), 800);
 
     } catch (error) {
         console.error(error);
@@ -213,23 +195,27 @@ async function handlePdfUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     try {
-        toggleLoading(true, 0, "Leyendo PDF...");
+        toggleLoading(true, 0, "Procesando PDF...");
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
         let fullText = "";
+
+        // Leemos todas las páginas
         for (let i = 1; i <= pdf.numPages; i++) {
             const pct = Math.round((i / pdf.numPages) * 100);
-            updateProgress(pct, `Leyendo página ${i} de ${pdf.numPages}...`);
+            updateProgress(pct, `Leyendo página ${i} de ${pdf.numPages}...`); // Feedback visual
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             fullText += textContent.items.map(item => item.str).join(' ');
         }
+
         elements.textarea.value = fullText;
         handleTextInput();
         switchInputMode('text');
         toggleLoading(false);
     } catch (error) {
-        alert('Error al leer PDF');
+        console.error(error);
+        alert('Error al leer el archivo PDF. Asegúrate de que no sea una imagen escaneada.');
         toggleLoading(false);
     }
     event.target.value = '';
@@ -241,43 +227,26 @@ function handleTextInput() {
     if (elements.analyzeBtn) elements.analyzeBtn.disabled = count < 50;
 }
 
-function splitTextSafe(text, maxLength) {
-    const chunks = [];
-    let currentChunk = '';
-    const paragraphs = text.split('\n');
-    for (let p of paragraphs) {
-        if ((currentChunk + p).length > maxLength) {
-            chunks.push(currentChunk);
-            currentChunk = '';
-        }
-        currentChunk += p + '\n';
-    }
-    if (currentChunk.trim()) chunks.push(currentChunk);
-    return chunks;
-}
-
-// --- CÁLCULO DE RIESGO REALISTA ---
+// --- CÁLCULO DE RIESGO ---
 function calculateRisk(markdown) {
-    const riskSectionMatch = markdown.match(/## Banderas Rojas\s+([\s\S]*?)(?=## |$)/i);
-    if (!riskSectionMatch || !riskSectionMatch[1]) return 'low'; // Si no encuentra sección, asume bajo por defecto
+    // Buscamos la sección de banderas rojas
+    const riskSectionMatch = markdown.match(/## Banderas Rojas[\s\S]*?(?=## |$)/i);
 
-    const riskContent = riskSectionMatch[1].trim();
-    const redFlagsCount = riskContent.split('\n')
-        .filter(line => /^\s*[-*]\s+/.test(line))
-        .length;
+    // Si no encuentra la sección o está vacía, riesgo bajo
+    if (!riskSectionMatch) return 'low';
 
-    // Lógica "Realista":
-    // 0-1: Bajo (Normal, siempre hay algo mínimo)
+    const riskContent = riskSectionMatch[0];
+
+    // Contamos items de lista (bullets) en esa sección
+    // Esto es una heurística: más bullets en "Banderas Rojas" = más peligro
+    const redFlagsCount = (riskContent.match(/^[-*]\s/gm) || []).length;
+
     if (redFlagsCount <= 1) return 'low';
-    
-    // 2-3: Medio (Hay cosas que vigilar)
-    if (redFlagsCount <= 3) return 'medium';
-    
-    // 4+: Alto (Peligroso)
+    if (redFlagsCount <= 4) return 'medium';
     return 'high';
 }
 
-// --- ACTUALIZACIÓN DEL SEMÁFORO ---
+// --- ACTUALIZACIÓN VISUAL (MINIMALISTA) ---
 function updateRiskGauge(riskLevel) {
     const container = elements.riskGaugeContainer;
     const label = elements.riskLabel;
@@ -285,38 +254,42 @@ function updateRiskGauge(riskLevel) {
 
     container.classList.remove('risk-low', 'risk-medium', 'risk-high');
 
-    switch(riskLevel) {
+    switch (riskLevel) {
         case 'low':
             container.classList.add('risk-low');
-            label.textContent = 'Riesgo Bajo / Estándar';
-            summary.textContent = 'Contiene términos comunes en la industria con un nivel de exposición aceptable.';
+            label.textContent = 'Bajo Riesgo';
+            summary.textContent = 'El documento parece estándar. No se detectaron cláusulas inusualmente agresivas.';
             break;
         case 'medium':
             container.classList.add('risk-medium');
             label.textContent = 'Riesgo Medio';
-            summary.textContent = 'Se detectaron varias cláusulas que requieren precaución por parte del usuario.';
+            summary.textContent = 'Atención: Hay cláusulas que limitan tus derechos o recolectan más datos de lo necesario.';
             break;
         case 'high':
             container.classList.add('risk-high');
             label.textContent = 'Alto Riesgo';
-            summary.textContent = 'La política contiene múltiples cláusulas agresivas o intrusivas. Se recomienda cautela extrema.';
+            summary.textContent = 'ALERTA: Se detectaron múltiples cláusulas abusivas, venta de datos o renuncias de derechos graves.';
             break;
     }
 }
 
 function processFinalResult(markdown) {
     window.currentMarkdown = markdown;
-    
+
     const riskLevel = calculateRisk(markdown);
     updateRiskGauge(riskLevel);
 
     if (window.parseMarkdown) {
         elements.reportContent.innerHTML = window.parseMarkdown(markdown);
-        const risks = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/);
-        elements.riskContent.innerHTML = risks ? window.parseMarkdown(risks[0]) : "✅ Sin riesgos críticos detectados.";
+
+        // Extraemos solo la parte de riesgos para la pestaña de "Riesgos"
+        const risksMatch = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/i);
+        const risksText = risksMatch ? risksMatch[0] : "✅ No se detectaron riesgos críticos específicos.";
+        elements.riskContent.innerHTML = window.parseMarkdown(risksText);
     } else {
         elements.reportContent.innerText = markdown;
     }
+
     elements.resultsSection.classList.add('active');
     elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
     toggleLoading(false);
