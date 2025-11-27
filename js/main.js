@@ -91,7 +91,7 @@ async function fetchUrlContent(url) {
         if (!text || text.length < 100 || text.includes("Jina AI - Access Denied")) {
             throw new Error("El sitio web tiene protección anti-bot muy estricta.");
         }
-        return text; 
+        return text; // Ya no recortamos artificialmente
     } catch (error) {
         throw new Error("No se pudo descargar la web automáticamente.");
     }
@@ -101,6 +101,7 @@ async function fetchUrlContent(url) {
 async function callGeminiDirect(text) {
     const apiKey = await getApiKey();
     const genAI = new GoogleGenerativeAI(apiKey);
+    // Usamos el modelo Flash que tiene ventana de contexto masiva (1M tokens)
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const systemPrompt = `Actúa como experto legal y CISO asesorando a un USUARIO COMUN.
@@ -108,30 +109,32 @@ async function callGeminiDirect(text) {
     OBJETIVO: Generar un reporte EXTREMADAMENTE CONCISO y resumido.
 
     INSTRUCCIONES DE SALIDA:
-    1. Usa listas con viñetas ("- ") SIEMPRE.
-    2. NO uses listas numeradas (1. 2. 3.), usa bullets.
-    3. Sé directo.
+    1. Usa listas con viñetas (bullets) cortas.
+    2. Sé directo.
+    3. Empieza directo con el título.
 
-    Estructura OBLIGATORIA (Markdown):
+    Estructura OBLIGATORIA:
     ## Resumen Ejecutivo
     (Máximo 5 líneas).
 
     ## Datos Recolectados
-    (Lista con viñetas "- ").
+    (Lista breve).
 
     ## Compartición con Terceros
     (Resumen breve).
 
     ## Banderas Rojas
-    (CRÍTICO: Usa una lista de viñetas "- " para cada riesgo. Si no hay riesgos graves, escribe "Ninguno". Cita textualmente si es necesario).    
+    (CRÍTICO: Usa una lista de viñetas ("- ") para cada riesgo detectado. Si no hay riesgos graves, escribe "Ninguno". Solo menciona cláusulas realmente abusivas o peligrosas, citando textualmente si es necesario).    
     
     ## Retención y Derechos
     (Brevemente).
 
     ## Recomendaciones para el Usuario
-    (Usa lista de viñetas "- ". Dame 3 acciones prácticas).`;
+    (3 acciones prácticas respecto al texto que el usuario proporcionó).`;
 
-    const fullPrompt = `${systemPrompt}\n\n--- INICIO DEL DOCUMENTO LEGAL ---\n${text}\n--- FIN DEL DOCUMENTO ---`;
+    const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
+
+
 
     try {
         const result = await model.generateContent(fullPrompt);
@@ -157,6 +160,7 @@ async function analyzePrivacy() {
             if (!url.startsWith('http')) { alert('URL inválida'); return; }
 
             toggleLoading(true, 10, "Conectando con lector inteligente...");
+            // Pequeño delay visual
             setTimeout(() => updateProgress(30, "Descargando contenido completo..."), 500);
 
             textToAnalyze = await fetchUrlContent(url);
@@ -172,7 +176,10 @@ async function analyzePrivacy() {
             return;
         }
 
-        // 2. Análisis
+        // 2. Análisis en una sola pasada
+        // Enviamos todo el texto de golpe. Gemini Flash soporta ~700,000 palabras.
+        // Tu límite de 100k caracteres es juego de niños para este modelo.
+
         toggleLoading(true, 50, "Analizando legalmente todo el documento...");
 
         const markdown = await callGeminiDirect(textToAnalyze);
@@ -197,9 +204,10 @@ async function handlePdfUpload(event) {
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
         let fullText = "";
 
+        // Leemos todas las páginas
         for (let i = 1; i <= pdf.numPages; i++) {
             const pct = Math.round((i / pdf.numPages) * 100);
-            updateProgress(pct, `Leyendo página ${i} de ${pdf.numPages}...`); 
+            updateProgress(pct, `Leyendo página ${i} de ${pdf.numPages}...`); // Feedback visual
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             fullText += textContent.items.map(item => item.str).join(' ');
@@ -225,11 +233,16 @@ function handleTextInput() {
 
 // --- CÁLCULO DE RIESGO ---
 function calculateRisk(markdown) {
+    // Buscamos la sección de banderas rojas
     const riskSectionMatch = markdown.match(/## Banderas Rojas[\s\S]*?(?=## |$)/i);
+
+    // Si no encuentra la sección o está vacía, riesgo bajo
     if (!riskSectionMatch) return 'low';
+
     const riskContent = riskSectionMatch[0];
-    
-    // Contamos items de lista (ahora solo buscamos bullets)
+
+    // Contamos items de lista (bullets) en esa sección
+    // Esto es una heurística: más bullets en "Banderas Rojas" = más peligro
     const redFlagsCount = (riskContent.match(/^[-*]\s/gm) || []).length;
 
     if (redFlagsCount <= 1) return 'low';
@@ -237,7 +250,7 @@ function calculateRisk(markdown) {
     return 'high';
 }
 
-// --- ACTUALIZACIÓN VISUAL ---
+// --- ACTUALIZACIÓN VISUAL (MINIMALISTA) ---
 function updateRiskGauge(riskLevel) {
     const container = elements.riskGaugeContainer;
     const label = elements.riskLabel;
@@ -272,6 +285,8 @@ function processFinalResult(markdown) {
 
     if (window.parseMarkdown) {
         elements.reportContent.innerHTML = window.parseMarkdown(markdown);
+
+        // Extraemos solo la parte de riesgos para la pestaña de "Riesgos"
         const risksMatch = markdown.match(/## Banderas Rojas[\s\S]*?(?=(## |$))/i);
         const risksText = risksMatch ? risksMatch[0] : "✅ No se detectaron riesgos críticos específicos.";
         elements.riskContent.innerHTML = window.parseMarkdown(risksText);
