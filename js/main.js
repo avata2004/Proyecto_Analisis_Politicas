@@ -130,7 +130,7 @@ async function callGeminiDirect(text) {
     (Brevemente).
 
     ## Recomendaciones para el Usuario
-    (3 acciones prácticas respecto al texto que el usuario proporcionó).`;
+    (acciones prácticas respecto al texto que el usuario proporcionó (maximo 5). Usa lista de viñetas "- ").`;
 
     const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
 
@@ -161,7 +161,7 @@ async function analyzePrivacy() {
 
             toggleLoading(true, 10, "Conectando con lector inteligente...");
             // Pequeño delay visual
-            setTimeout(() => updateProgress(30, "Descargando contenido completo..."), 500);
+            setTimeout(() => updateProgress(30, "Descargando contenido..."), 500);
 
             textToAnalyze = await fetchUrlContent(url);
 
@@ -176,11 +176,8 @@ async function analyzePrivacy() {
             return;
         }
 
-        // 2. Análisis en una sola pasada
-        // Enviamos todo el texto de golpe. Gemini Flash soporta ~700,000 palabras.
-        // Tu límite de 100k caracteres es juego de niños para este modelo.
 
-        toggleLoading(true, 50, "Analizando legalmente todo el documento...");
+        toggleLoading(true, 50, "Analizando legalmente el documento...");
 
         const markdown = await callGeminiDirect(textToAnalyze);
 
@@ -250,7 +247,7 @@ function calculateRisk(markdown) {
     return 'high';
 }
 
-// --- ACTUALIZACIÓN VISUAL (MINIMALISTA) ---
+
 function updateRiskGauge(riskLevel) {
     const container = elements.riskGaugeContainer;
     const label = elements.riskLabel;

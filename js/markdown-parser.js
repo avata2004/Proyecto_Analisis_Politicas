@@ -21,14 +21,11 @@ function parseMarkdown(text) {
 
     // Negrita (**texto**)
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
-    // 1. Listas numeradas (1. item, 2. item) -> Las convertimos a <li>
-    html = html.replace(/^\d+\.\s(.+)$/gm, '<li>$1</li>');
 
-    // 2. Listas con asterisco (* item)
+    // Listas con asterisco (* item)
     html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
 
-    // 3. Listas con guion (- item)
+    // Listas con guion (- item)
     html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
 
     // Envolver listas consecutivas en <ul>
@@ -52,7 +49,7 @@ function cleanDuplicateTags(html) {
     // Eliminar <ul> vacíos
     html = html.replace(/<ul>\s*<\/ul>/g, '');
     
-    // Consolidar <ul> consecutivos (ej: </ul><ul> se vuelve nada para unir las listas)
+    // Consolidar <ul> consecutivos
     html = html.replace(/<\/ul>\s*<ul>/g, '');
     
     return html;
@@ -68,4 +65,39 @@ function extractSection(markdown, sectionTitle) {
     const regex = new RegExp(`## ${sectionTitle}[\\s\\S]*?(?=## |$)`, 'i');
     const match = markdown.match(regex);
     return match ? match[0] : null;
+}
+
+/**
+ * Convierte markdown a texto plano (sin HTML)
+ * @param {string} markdown - Texto markdown
+ * @returns {string} - Texto plano
+ */
+function markdownToPlainText(markdown) {
+    return markdown
+        .replace(/^#+\s/gm, '') // Eliminar headers
+        .replace(/\*\*/g, '')    // Eliminar negrita
+        .replace(/^\*\s/gm, '• ') // Convertir listas a bullets
+        .replace(/^-\s/gm, '• ') // Convertir listas a bullets
+        .trim();
+}
+
+/**
+ * Cuenta palabras en un texto markdown
+ * @param {string} markdown - Texto markdown
+ * @returns {number} - Cantidad de palabras
+ */
+function countWords(markdown) {
+    const plainText = markdownToPlainText(markdown);
+    return plainText.split(/\s+/).filter(word => word.length > 0).length;
+}
+
+/**
+ * Estima el tiempo de lectura de un texto
+ * @param {string} markdown - Texto markdown
+ * @param {number} wpm - Palabras por minuto (default: 200)
+ * @returns {number} - Tiempo estimado en minutos
+ */
+function estimateReadingTime(markdown, wpm = 200) {
+    const words = countWords(markdown);
+    return Math.ceil(words / wpm);
 }
