@@ -117,7 +117,7 @@ async function callGeminiDirect(text) {
     ## Resumen Ejecutivo
     (Máximo 5 líneas).
 
-    ## Datos Recolectados
+    ## Datos Recolectados del Usuario
     (Lista breve).
 
     ## Compartición con Terceros
