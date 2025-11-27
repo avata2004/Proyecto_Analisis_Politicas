@@ -132,6 +132,9 @@ async function callGeminiDirect(text) {
     ## Recomendaciones para el Usuario
     (3 acciones prácticas respecto al texto que el usuario proporcionó).`;
 
+    const fullPrompt = `${systemPrompt}\n\n--- TEXTO A ANALIZAR ---\n${text}`;
+
+
     try {
         const result = await model.generateContent(fullPrompt);
         const response = await result.response;
